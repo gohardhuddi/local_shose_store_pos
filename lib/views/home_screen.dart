@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:local_shoes_store_pos/views/add_stock_screen.dart';
 import 'package:local_shoes_store_pos/views/theme_bloc/theme_bloc.dart';
 import 'package:local_shoes_store_pos/views/theme_bloc/theme_event.dart';
+import 'package:local_shoes_store_pos/views/view_stock_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final List<Widget> _pages = [
       const Center(child: Text("Home Page")),
-      const Center(child: AddStockScreen()),
+      const Center(child: ViewStockScreen()),
       const Center(child: Text("Profile Page")),
       Center(
         child: Switch(

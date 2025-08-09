@@ -1,0 +1,29 @@
+import 'package:local_shoes_store_pos/services/add_stock_service_local.dart';
+
+class AddStockRepository {
+  final StockServiceLocal _stockServiceLocal;
+  AddStockRepository(this._stockServiceLocal);
+  Future<void> addStockToDBRepo({
+    required String brand,
+    required String articleCode,
+    required String? articleName,
+    required String size,
+    required String color,
+    required String productCodeSku,
+    required String quantity,
+    required String purchasePrice,
+    required String suggestedSalePrice,
+  }) async {
+    _stockServiceLocal.addStockToDbService(
+      brand: brand,
+      articleCode: articleCode,
+      articleName: articleName,
+      size: size,
+      color: color,
+      productCodeSku: productCodeSku,
+      quantity: quantity,
+      purchasePrice: purchasePrice,
+      suggestedSalePrice: suggestedSalePrice,
+    );
+  }
+}
