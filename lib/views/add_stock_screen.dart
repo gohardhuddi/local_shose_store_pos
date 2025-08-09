@@ -42,9 +42,18 @@ class _AddStockScreenState extends State<AddStockScreen> {
               child: Column(
                 spacing: 15,
                 children: [
-                  Text(
-                    CustomStrings.shopName,
-                    style: Theme.of(context).textTheme.titleLarge,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(onPressed: (){
+                        Navigator.pop(context);
+                      }, icon: Icon(Icons.arrow_back_ios_sharp)),
+                      Text(
+                        CustomStrings.shopName,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      Container()
+                    ],
                   ),
                   Text(
                     "Add Stock",
