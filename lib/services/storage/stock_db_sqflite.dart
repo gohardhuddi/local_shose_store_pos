@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -170,4 +172,81 @@ CREATE TABLE product_variants (
   Future<List<Map<String, dynamic>>> getAllVariants() async {
     return await db.query('product_variants');
   }
+  @override
+  Future<String> getAllStock() async {
+    // 1) one query: products + variants
+    final rows = await db.rawQuery('''
+    SELECT
+      p.product_id        AS p_id,
+      p.brand             AS p_brand,
+      p.article_code      AS p_code,
+      p.article_name      AS p_name,
+      p.is_active         AS p_active,
+      p.created_at        AS p_created,
+      p.updated_at        AS p_updated,
+
+      v.product_variant_id AS v_id,
+      v.sku                AS v_sku,
+      v.size_eu            AS v_size,
+      v.color_name         AS v_color_name,
+      v.color_hex          AS v_color_hex,
+      v.quantity           AS v_qty,
+      v.purchase_price     AS v_purchase,
+      v.sale_price         AS v_sale,
+      v.is_active          AS v_active,
+      v.is_synced          AS v_synced,
+      v.created_at         AS v_created,
+      v.updated_at         AS v_updated
+    FROM products p
+    LEFT JOIN product_variants v
+      ON v.product_id = p.product_id
+    ORDER BY p.article_code ASC, v.sku ASC
+  ''');
+
+    // 2) group by product, attach variants
+    final byId = <String, Map<String, dynamic>>{};
+    for (final r in rows) {
+      final pid = r['p_id'].toString();
+      final product = byId.putIfAbsent(pid, () => {
+        'productId'   : pid,
+        'brand'       : (r['p_brand'] ?? '').toString(),
+        'articleCode' : (r['p_code'] ?? '').toString(),
+        'articleName' : (r['p_name'] ?? '').toString(),
+        'isActive'    : (r['p_active'] ?? 1) == 1,
+        'createdAt'   : r['p_created'],
+        'updatedAt'   : r['p_updated'],
+        'totalQty'    : 0,
+        'variantCount': 0,
+        'variants'    : <Map<String, dynamic>>[],
+      });
+
+      // LEFT JOIN means: variant columns can be null if product has no variants
+      if (r['v_id'] != null) {
+        final vQty = (r['v_qty'] as int?) ?? 0;
+        final variant = {
+          'variantId'     : r['v_id'].toString(),
+          'sku'           : (r['v_sku'] ?? '').toString(),
+          'size'          : r['v_size'],
+          'colorName'     : (r['v_color_name'] ?? '').toString(),
+          'colorHex'      : r['v_color_hex'],
+          'qty'           : vQty,
+          'purchasePrice' : (r['v_purchase'] as num?)?.toDouble(),
+          'salePrice'     : (r['v_sale'] as num?)?.toDouble(),
+          'isActive'      : (r['v_active'] ?? 1) == 1,
+          'isSynced'      : (r['v_synced'] ?? 0) == 1,
+          'createdAt'     : r['v_created'],
+          'updatedAt'     : r['v_updated'],
+        };
+
+        (product['variants'] as List).add(variant);
+        product['totalQty']     = (product['totalQty'] as int) + vQty;
+        product['variantCount'] = (product['variantCount'] as int) + 1;
+      }
+    }
+
+    // 3) to list (already ordered by article_code in SQL; the sort below is optional)
+    final list = byId.values.toList()
+      ..sort((a, b) => (a['articleCode'] as String).compareTo(b['articleCode'] as String));
+
+    return jsonEncode(list);}
 }

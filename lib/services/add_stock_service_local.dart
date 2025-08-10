@@ -1,7 +1,9 @@
+import 'dart:convert';
+
 import '../main.dart';
 
 class StockServiceLocal {
-  Future<void> addStockToDbService({
+  Future<String> addStockToDbService({
     required String brand,
     required String articleCode,
     required String? articleName,
@@ -18,7 +20,7 @@ class StockServiceLocal {
       articleName: articleName?.trim(),
     );
 
-    var result = await stockDb.upsertVariant(
+   await stockDb.upsertVariant(
       productId: productId,
       sizeEu: int.parse(size),
       colorName: color!,
@@ -27,11 +29,10 @@ class StockServiceLocal {
       purchasePrice: double.parse(purchasePrice),
       salePrice: double.parse(suggestedSalePrice),
     );
-    print(result);
-    final allProducts = await stockDb.getAllProducts();
-    print("Products: $allProducts");
-
-    final allVariants = await stockDb.getAllVariants();
-    print("Variants: $allVariants");
+   return productId;
+  }
+  Future<dynamic> getAllStock() async {
+   return await stockDb.getAllStock();
+   ///it will return json and all other stuff like join etc and heavy logics are in db class
   }
 }

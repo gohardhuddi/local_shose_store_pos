@@ -44,6 +44,9 @@ dependencies:
   sembast: ^3.7.4
   sembast_web: ^2.4.0
   persistent_bottom_nav_bar: ^6.2.1
+  font_awesome_flutter: ^10.9.0
+  stream_transform: ^2.1.0
+
 
 dev_dependencies:
   flutter_test:
@@ -69,8 +72,8 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
+  assets:
+    - assets/images/shoe_black_icon.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

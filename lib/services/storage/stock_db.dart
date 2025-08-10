@@ -1,3 +1,5 @@
+import 'package:sembast/sembast.dart';
+
 abstract class StockDb {
   Future<void> init();
 
@@ -23,4 +25,5 @@ abstract class StockDb {
   ///fetch data all
   Future<List<Map<String, dynamic>>> getAllProducts();
   Future<List<Map<String, dynamic>>> getAllVariants();
+  Future<String> getAllStock();
 }

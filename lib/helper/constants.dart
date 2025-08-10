@@ -1,8 +1,8 @@
 import 'dart:ui';
 
 class CustomImagesPaths {
-  static const sliderImage1 = "assets/images/carisol_image_1.png";
-  static const sliderImage2 = "assets/images/carisol_image_2.png";
+  static const shoeBlackIcon = "assets/images/shoe_black_icon.png";
+  static const shoeWhiteIcon = "assets/images/shoe_white_icon.png";
   static const sliderImage3 = "assets/images/carisol_image_3.png";
   static const facebookIcon = "assets/images/facebook_icon.png";
   static const googleIcon = "assets/images/google_icon.png";

@@ -27,6 +27,7 @@ class AddStockToDB extends AddStockEvents {
     required this.size,
     required this.suggestedSalePrice,
   });
+
   @override
   List<Object> get props => [
     brand,
@@ -38,4 +39,15 @@ class AddStockToDB extends AddStockEvents {
     suggestedSalePrice,
     size,
   ];
+}
+
+class GetStockFromDB extends AddStockEvents {
+  GetStockFromDB();
+
+  @override
+  List<Object> get props => [];
+}
+class SearchQueryChanged extends AddStockEvents {
+  final String query;
+  SearchQueryChanged(this.query);
 }

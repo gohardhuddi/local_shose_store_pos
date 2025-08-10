@@ -1,115 +1,149 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_bloc.dart';
+import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_events.dart';
+import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_states.dart';
+import 'package:local_shoes_store_pos/helper/constants.dart';
+import 'package:local_shoes_store_pos/models/stock_model.dart';
 import 'package:local_shoes_store_pos/views/add_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
-import '../main.dart' show stockDb;        // assumes you exposed `stockDb` in main.dart
 
 class ViewStockScreen extends StatefulWidget {
   const ViewStockScreen({super.key, this.onOpenDetails});
-
-  final void Function(String sku)? onOpenDetails; // optional callback
+  final void Function(String sku)? onOpenDetails;
 
   @override
   State<ViewStockScreen> createState() => _ViewStockScreenState();
 }
 
 class _ViewStockScreenState extends State<ViewStockScreen> {
-  final categories = _sampleCategories;
   @override
-  Widget build(BuildContext context) {
-  return  Scaffold(
-    body: ListView.builder(
-        key: const PageStorageKey('categories_list'),
-        // keeps expansion state on navigation
-        itemCount: categories.length,
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        itemBuilder: (context, index) {
-          final cat = categories[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: ExpansionTile(
-              leading: CircleAvatar(child: Text(cat.brand[0])),
-              title: Text(
-                  cat.brand, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text('${cat.variants.length} items'),
-              // Unique key helps Flutter preserve expanded/collapsed state per tile
-              key: PageStorageKey('expansion_${cat.brand}'),
-              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              children: [
-                ...cat.variants.map((item) =>
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.label_important_outline),
-                      title: Text(item.title),
-                      subtitle: Text(item.subtitle),
-                      trailing: Text('\$${item.price.toStringAsFixed(2)}'),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Tapped ${item.title}')),
-                        );
-                      },
-                    )),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text('Add all'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    floatingActionButton: FloatingActionButton.extended(onPressed: (){
-      PersistentNavBarNavigator.pushNewScreen(
-        context,
-        screen: AddStockScreen(),
-        withNavBar: true, // OPTIONAL VALUE. True by default.
-        pageTransitionAnimation: PageTransitionAnimation.cupertino,
-      );
-
-    }, label: Text("Add Stock")),
-  );
+  void initState() {
+    super.initState();
+    _load();
   }
 
+  void _load() {
+    context.read<AddStockBloc>().add(GetStockFromDB());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('${CustomStrings.shopName} Stock'),centerTitle: true,),
+      body: Column(
+        children: [
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: TextField(
+              onChanged: (q) => context.read<AddStockBloc>().add(SearchQueryChanged(q)),
+              decoration: InputDecoration(
+                hintText: 'Search brand, article, SKU, color, size…',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                isDense: true,
+              ),),),
+          Expanded(
+            child: BlocListener<AddStockBloc, AddStockStates>(
+              listener: (BuildContext context, state) {
+                if(state is AddStockSuccessState){
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.successMessage),backgroundColor: Colors.green,));
+                }
+              },
+              child: BlocBuilder<AddStockBloc, AddStockStates>(
+                builder: (context, state) {
+                  if (state is AddStockLoadingState) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (state is GetStockFromDBSuccessState) {
+                    final List<StockModel> items = state.stockList;
+                    if (items.isEmpty) {
+                      return const Center(child: Text('No stock yet. Add some!'));
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: () async => _load(),
+                      child: Column(
+                        children: [
+
+                          Expanded(
+                            child: ListView.builder(
+                              key: const PageStorageKey('stock_list'),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              itemCount: items.length,
+                              itemBuilder: (context, index) {
+                                final p = items[index];
+
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  child: ExpansionTile(
+                                    key: PageStorageKey('expansion_${p.productId}_${p.articleCode}'),
+                                    leading: CircleAvatar(child: Text((p.brand?.isNotEmpty ?? false) ? p.brand![0] : '?')),
+                                    title: Text(
+                                      '${p.brand ?? ''} - ${p.articleCode ?? ''}',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                    subtitle: Text('Qty ${p.totalQty ?? 0}  |  Variants ${p.variantCount ?? 0}'),
+                                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                    children: [
+                                      ...p.variants.map((v) => ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: CircleAvatar(backgroundColor:Colors.white,child: Image.asset(CustomImagesPaths.shoeBlackIcon)),
+                                        title: Text('SKU: ${v.sku}   Size: ${v.size}   Color: ${v.colorName}'),
+                                        subtitle: Text('Qty: ${v.qty}   Buy: ${v.purchasePrice?.toStringAsFixed(0)}   Sell: ${v.salePrice?.toStringAsFixed(0)}'),
+                                        trailing: FilledButton.icon(
+                                          onPressed: () {
+                                            // TODO: implement "Add all" behavior
+                                          },
+                                          icon: const Icon(Icons.edit_document),
+                                          label: const Text('Edit stock'),
+                                        ),
+                                        onTap: () {
+                                          // callback for details if you want
+                                          widget.onOpenDetails?.call(v.sku ?? '');
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Tapped ${v.sku}')),
+                                          );
+                                        },
+                                      )),
+                                      const SizedBox(height: 8),
+
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Fallback for any other state (e.g., initial)
+                  return const Center(child: Text('Loading stock...'));
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          PersistentNavBarNavigator.pushNewScreen(
+            context,
+            screen: const AddStockScreen(),
+            withNavBar: true,
+            pageTransitionAnimation: PageTransitionAnimation.cupertino,
+          ).then((_) => _load()); // refresh after returning
+        },
+        label: const Row(
+          children: [Icon(Icons.add), SizedBox(width: 8), Text('Add Stock')],
+        ),
+      ),
+    );
+  }
 }
-
-class Category {
-  final String brand;
-  final String articleCode;
-  final String variant;
-  final String quantity;
-  final List<Item> variants;
-
-  Category({required this.variant, required this.brand, required this.variants,required this.articleCode,required this.quantity});
-}
-
-class Item {
-  final String title;
-  final String subtitle;
-  final double price;
-
-  Item({required this.title, required this.subtitle, required this.price});
-}
-
-/* ---------- Fake data ---------- */
-
-final _sampleCategories = <Category>[
-  Category(brand: 'Shoes', variants: [
-    Item(title: 'Runner Pro', subtitle: 'Lightweight road shoe', price: 79.99),
-    Item(title: 'Trail Max', subtitle: 'Rugged trail runner', price: 99.50),
-  ]),
-  Category(brand: 'Hats', variants: [
-    Item(title: 'Snapback', subtitle: 'Classic adjustable cap', price: 24.00),
-    Item(title: 'Beanie', subtitle: 'Warm knit beanie', price: 18.75),
-    Item(title: 'Bucket', subtitle: 'Casual bucket hat', price: 22.30),
-  ]),
-  Category(brand: 'Accessories', variants: [
-    Item(title: 'Socks (3-pack)', subtitle: 'Breathable cotton blend', price: 12.90),
-    Item(title: 'Laces', subtitle: 'Flat replacement laces', price: 4.50),
-  ]),
-];

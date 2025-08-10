@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:local_shoes_store_pos/models/stock_model.dart';
 
 sealed class AddStockStates extends Equatable {
   @override
@@ -21,4 +22,13 @@ class AddStockErrorState extends AddStockStates {
 
   @override
   List<Object> get props => [error];
+}class GetStockFromDBSuccessState extends AddStockStates {
+
+ final List<StockModel> stockList;
+ final String query;
+  GetStockFromDBSuccessState({required this.stockList, required this.query});
+
+
+  @override
+  List<Object> get props => [stockList];
 }
