@@ -7,7 +7,7 @@ import 'add_stock_events.dart';
 import 'add_stock_states.dart'; // for debounce
 
 EventTransformer<T> debounce<T>(Duration d) =>
-        (events, mapper) => events.debounce(d).switchMap(mapper);
+    (events, mapper) => events.debounce(d).switchMap(mapper);
 
 class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
   final AddStockRepository _addStockRepo;
@@ -16,14 +16,19 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
   AddStockBloc(this._addStockRepo) : super(AddStockInitialState()) {
     on<AddStockToDB>(_onAddStockToDB);
     on<GetStockFromDB>(_onGetAllStock);
-    on<SearchQueryChanged>(_onSearchChanged, transformer: debounce(const Duration(milliseconds: 220)));
+    on<DeleteVariantByIdEvent>(_onDeleteVariantById);
+    on<SearchQueryChanged>(
+      _onSearchChanged,
+      transformer: debounce(const Duration(milliseconds: 220)),
+    );
   }
+
   Future<void> _onAddStockToDB(
-      AddStockToDB event,
-      Emitter<AddStockStates> emit,
-      ) async {
+    AddStockToDB event,
+    Emitter<AddStockStates> emit,
+  ) async {
     emit(AddStockLoadingState());
-   final productId= await _addStockRepo.addStockToDBRepo(
+    final productId = await _addStockRepo.addStockToDBRepo(
       brand: event.brand,
       articleCode: event.articleCode,
       articleName: event.articleName,
@@ -33,43 +38,74 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       quantity: event.quantity,
       purchasePrice: event.purchasePrice,
       suggestedSalePrice: event.suggestedSalePrice,
+      isEdit: event.isEdit,
     );
-   if(productId.isNotEmpty){
-    emit(AddStockSuccessState());}
+    if (productId.isNotEmpty) {
+      emit(AddStockSuccessState());
+    }
   }
-  Future<void> _onGetAllStock(GetStockFromDB e, Emitter<AddStockStates> emit) async {
+
+  Future<void> _onGetAllStock(
+    GetStockFromDB e,
+    Emitter<AddStockStates> emit,
+  ) async {
     emit(AddStockLoadingState());
     final json = await _addStockRepo.getAllStockRepo();
+    print(json);
     _all = StockModel.listFromJsonString(json);
-    print(_all);
-    emit(GetStockFromDBSuccessState(stockList: _all,  query: ''));
+
+    emit(GetStockFromDBSuccessState(stockList: _all, query: ''));
   }
 
-  Future<void> _onSearchChanged(SearchQueryChanged e, Emitter<AddStockStates> emit) async {
+  Future<void> _onDeleteVariantById(
+    DeleteVariantByIdEvent event,
+    Emitter<AddStockStates> emit,
+  ) async {
+    emit(AddStockLoadingState());
+    await _addStockRepo.deleteVariantById(event.variantID);
+
+    emit(DeleteVariantByIdSuccessState());
+  }
+
+  Future<void> _onSearchChanged(
+    SearchQueryChanged e,
+    Emitter<AddStockStates> emit,
+  ) async {
     var temp;
-    if(e.query.isNotEmpty){
+    if (e.query.isNotEmpty) {
       final terms = _tokenize(e.query);
-      final filtered = terms.isEmpty ? _all : _all.where((p) => _matchesProduct(p, terms)).toList();
-      temp=filtered;
+      final filtered = terms.isEmpty
+          ? _all
+          : _all.where((p) => _matchesProduct(p, terms)).toList();
+      temp = filtered;
+    } else {
+      temp = _all;
     }
-    else
-      {
-        temp=_all;
-      }
-     emit(GetStockFromDBSuccessState(stockList: temp, query: e.query));
+    emit(GetStockFromDBSuccessState(stockList: temp, query: e.query));
   }
 
-  List<String> _tokenize(String q) => q.toLowerCase().trim().split(RegExp(r'\s+')).where((t)=>t.isNotEmpty).toList();
+  List<String> _tokenize(String q) => q
+      .toLowerCase()
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((t) => t.isNotEmpty)
+      .toList();
 
   bool _matchesProduct(StockModel p, List<String> terms) {
     final buf = StringBuffer()
-      ..write((p.brand ?? '').toLowerCase())..write(' ')
-      ..write((p.articleCode ?? '').toLowerCase())..write(' ')
+      ..write((p.brand ?? '').toLowerCase())
+      ..write(' ')
+      ..write((p.articleCode ?? '').toLowerCase())
+      ..write(' ')
       ..write((p.articleName ?? '').toLowerCase());
     for (final v in p.variants) {
-      buf..write(' ')..write((v.sku ?? '').toLowerCase())
-        ..write(' ')..write((v.colorName ?? '').toLowerCase())
-        ..write(' ')..write('${v.size ?? ''}');
+      buf
+        ..write(' ')
+        ..write((v.sku ?? '').toLowerCase())
+        ..write(' ')
+        ..write((v.colorName ?? '').toLowerCase())
+        ..write(' ')
+        ..write('${v.size ?? ''}');
     }
     final hay = buf.toString();
     return terms.every(hay.contains);

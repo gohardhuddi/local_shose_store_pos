@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import '../main.dart';
 
 class StockServiceLocal {
@@ -13,6 +11,7 @@ class StockServiceLocal {
     required String quantity,
     required String purchasePrice,
     required String suggestedSalePrice,
+    required bool isEdit,
   }) async {
     final productId = await stockDb.upsertProduct(
       brand: brand.trim(),
@@ -20,7 +19,7 @@ class StockServiceLocal {
       articleName: articleName?.trim(),
     );
 
-   await stockDb.upsertVariant(
+    await stockDb.upsertVariant(
       productId: productId,
       sizeEu: int.parse(size),
       colorName: color!,
@@ -28,11 +27,18 @@ class StockServiceLocal {
       quantity: int.parse(quantity),
       purchasePrice: double.parse(purchasePrice),
       salePrice: double.parse(suggestedSalePrice),
+      isEdit: isEdit,
     );
-   return productId;
+    return productId;
   }
+
   Future<dynamic> getAllStock() async {
-   return await stockDb.getAllStock();
-   ///it will return json and all other stuff like join etc and heavy logics are in db class
+    return await stockDb.getAllStock();
+
+    ///it will return json and all other stuff like join etc and heavy logics are in db class
+  }
+
+  Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
+    return await stockDb.deleteVariantById(variantId);
   }
 }

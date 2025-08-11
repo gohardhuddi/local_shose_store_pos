@@ -22,13 +22,20 @@ class AddStockErrorState extends AddStockStates {
 
   @override
   List<Object> get props => [error];
-}class GetStockFromDBSuccessState extends AddStockStates {
+}
 
- final List<StockModel> stockList;
- final String query;
+class GetStockFromDBSuccessState extends AddStockStates {
+  final List<StockModel> stockList;
+  final String query;
   GetStockFromDBSuccessState({required this.stockList, required this.query});
-
 
   @override
   List<Object> get props => [stockList];
+}
+
+class DeleteVariantByIdSuccessState extends AddStockStates {
+  final String success = "Variant Deleted Successfully";
+
+  @override
+  List<Object> get props => [success];
 }

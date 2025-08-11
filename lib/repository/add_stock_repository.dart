@@ -13,8 +13,9 @@ class AddStockRepository {
     required String quantity,
     required String purchasePrice,
     required String suggestedSalePrice,
+    required bool isEdit,
   }) async {
-   return _stockServiceLocal.addStockToDbService(
+    return _stockServiceLocal.addStockToDbService(
       brand: brand,
       articleCode: articleCode,
       articleName: articleName,
@@ -24,9 +25,15 @@ class AddStockRepository {
       quantity: quantity,
       purchasePrice: purchasePrice,
       suggestedSalePrice: suggestedSalePrice,
+      isEdit: isEdit,
     );
   }
-  Future<dynamic> getAllStockRepo() async{
-   return await _stockServiceLocal.getAllStock();
+
+  Future<dynamic> getAllStockRepo() async {
+    return await _stockServiceLocal.getAllStock();
+  }
+
+  Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
+    return await _stockServiceLocal.deleteVariantById(variantId);
   }
 }

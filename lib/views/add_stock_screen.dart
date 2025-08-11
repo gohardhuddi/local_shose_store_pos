@@ -4,14 +4,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_bloc.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_events.dart';
 import 'package:local_shoes_store_pos/helper/constants.dart';
+import 'package:local_shoes_store_pos/models/stock_model.dart';
 import 'package:local_shoes_store_pos/views/view_helpers/resueables/custom_button.dart';
 import 'package:local_shoes_store_pos/views/view_helpers/resueables/custom_text_field.dart';
 
 import '../controller/add_stock_bloc/add_stock_states.dart';
 
 class AddStockScreen extends StatefulWidget {
-  const AddStockScreen({super.key});
-
+  StockModel? stock;
+  VariantModel? varient;
+  AddStockScreen({super.key, this.stock, this.varient});
   @override
   State<AddStockScreen> createState() => _AddStockScreenState();
 }
@@ -19,32 +21,63 @@ class AddStockScreen extends StatefulWidget {
 String? selectedColor;
 TextEditingController customColorController = TextEditingController();
 
-final List<String> colors = ['Black', 'Brown', 'White', 'Red', 'Blue', 'Other'];
-TextEditingController brandController = TextEditingController();
-TextEditingController articleCodeController = TextEditingController();
-TextEditingController suggestedSalePriceController = TextEditingController();
-TextEditingController purchasePriceController = TextEditingController();
-TextEditingController quantityController = TextEditingController();
-TextEditingController productCodeSKUController = TextEditingController();
-TextEditingController sizeController = TextEditingController();
-TextEditingController articleNameController = TextEditingController();
-final _formKey = GlobalKey<FormState>();
-
 class _AddStockScreenState extends State<AddStockScreen> {
+  final List<String> colors = [
+    'Black',
+    'Brown',
+    'White',
+    'Red',
+    'Blue',
+    'Other',
+  ];
+  TextEditingController brandController = TextEditingController();
+  TextEditingController articleCodeController = TextEditingController();
+  TextEditingController suggestedSalePriceController = TextEditingController();
+  TextEditingController purchasePriceController = TextEditingController();
+  TextEditingController quantityController = TextEditingController();
+  TextEditingController productCodeSKUController = TextEditingController();
+  TextEditingController sizeController = TextEditingController();
+  TextEditingController articleNameController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  @override
+  void initState() {
+    final v = widget.varient;
+    if (v != null) {
+      brandController.text = widget.stock!.brand;
+      articleCodeController.text = widget.stock!.articleCode;
+      articleNameController.text = widget.stock!.articleName;
+      suggestedSalePriceController.text = v!.salePrice.round().toString();
+      purchasePriceController.text = v!.purchasePrice.round().toString();
+      quantityController.text = v!.qty.toString();
+      productCodeSKUController.text = v!.sku;
+      sizeController.text = v!.size.toString();
+      _prefillColorFromVariant(v.colorName); // 👈 this does the logic
+    }
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(18.0),
           child: SingleChildScrollView(
             child: Form(
               key: _formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: BlocListener<AddStockBloc, AddStockStates>(
                 listener: (BuildContext context, state) {
-                  if(state is AddStockSuccessState){
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.successMessage,style: TextStyle(color: Colors.white),),backgroundColor: Colors.green,));
+                  if (state is AddStockSuccessState) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          state.successMessage,
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
                   }
                 },
                 child: Column(
@@ -53,17 +86,20 @@ class _AddStockScreenState extends State<AddStockScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        IconButton(onPressed: (){
-                           brandController.clear();
-                           articleCodeController .clear();
-                           suggestedSalePriceController.clear();
-                           purchasePriceController .clear();
-                           quantityController .clear();
-                           productCodeSKUController .clear();
-                           sizeController .clear();
-                           articleNameController .clear();
-                          Navigator.pop(context);
-                        }, icon: Icon(Icons.arrow_back_ios_sharp)),
+                        IconButton(
+                          onPressed: () {
+                            brandController.clear();
+                            articleCodeController.clear();
+                            suggestedSalePriceController.clear();
+                            purchasePriceController.clear();
+                            quantityController.clear();
+                            productCodeSKUController.clear();
+                            sizeController.clear();
+                            articleNameController.clear();
+                            Navigator.pop(context);
+                          },
+                          icon: Icon(Icons.arrow_back_ios_sharp),
+                        ),
                         Transform.translate(
                           offset: Offset(-20, 0),
                           child: Text(
@@ -71,7 +107,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ),
-                        Container()
+                        Container(),
                       ],
                     ),
                     Text(
@@ -107,8 +143,10 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       hintText: "e.g 48",
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (value) =>
-                          requiredFieldValidator(value: value, fieldName: "Size"),
+                      validator: (value) => requiredFieldValidator(
+                        value: value,
+                        fieldName: "Size",
+                      ),
                     ),
 
                     DropdownButtonFormField<String>(
@@ -119,14 +157,15 @@ class _AddStockScreenState extends State<AddStockScreen> {
                         border: OutlineInputBorder(),
                       ),
                       items: colors.map((color) {
-                        return DropdownMenuItem(value: color, child: Text(color));
+                        return DropdownMenuItem(
+                          value: color,
+                          child: Text(color),
+                        );
                       }).toList(),
                       onChanged: (value) {
                         selectedColor = value;
-                        setState(() {
-                          productCodeSKUController.text =
-                              "${articleCodeController.text}-$selectedColor-${sizeController.text}";
-                        });
+                        updateSku();
+                        setState(() {});
                       },
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -138,9 +177,10 @@ class _AddStockScreenState extends State<AddStockScreen> {
 
                     selectedColor == 'Other'
                         ? CustomTextField(
-                            textEditingController: TextEditingController(),
+                            textEditingController: customColorController,
                             labelText: "Color *",
                             hintText: "e.g Black",
+                            onChanged: (v) => updateSku(),
                           )
                         : SizedBox.shrink(),
                     CustomTextField(
@@ -166,7 +206,8 @@ class _AddStockScreenState extends State<AddStockScreen> {
                           if (int.tryParse(value ?? "0")! > 0) {
                             return decision = null;
                           } else {
-                            return decision = "Quantity should be greater then 0";
+                            return decision =
+                                "Quantity should be greater then 0";
                           }
                         }
                         return decision;
@@ -223,15 +264,20 @@ class _AddStockScreenState extends State<AddStockScreen> {
                               articleCode: articleCodeController.text.trim(),
                               articleName: articleNameController.text.trim(),
                               brand: brandController.text.trim(),
-                              color: selectedColor!.trim(),
+                              color:
+                                  selectedColor!.trim().toLowerCase() == "other"
+                                  ? customColorController.text
+                                  : selectedColor!.trim(),
                               productCodeSku: productCodeSKUController.text
                                   .trim(),
-                              purchasePrice: purchasePriceController.text.trim(),
+                              purchasePrice: purchasePriceController.text
+                                  .trim(),
                               quantity: quantityController.text.trim(),
                               size: sizeController.text.trim(),
                               suggestedSalePrice: suggestedSalePriceController
                                   .text
                                   .trim(),
+                              isEdit: widget.varient != null ? true : false,
                             ),
                           );
                         }
@@ -253,5 +299,46 @@ class _AddStockScreenState extends State<AddStockScreen> {
       return '$fieldName is required';
     }
     return null;
+  }
+
+  void updateSku() {
+    final code = articleCodeController.text.trim();
+    final color = _currentColorValue();
+    final size = sizeController.text.trim();
+    setState(() {
+      productCodeSKUController.text = "$code-$color-$size";
+    });
+  }
+
+  String _currentColorValue() {
+    if (selectedColor == null) return '';
+    if (selectedColor == 'Other') {
+      // Use trimmed, hyphen-safe value for SKU
+      final v = customColorController.text.trim();
+      return v.isEmpty ? '' : v.replaceAll(' ', '-');
+    }
+    return selectedColor!;
+  }
+
+  void _prefillColorFromVariant(String? colorName) {
+    final other = 'Other';
+    final c = (colorName ?? '').trim();
+
+    // case-insensitive match against your list
+    final match = colors.firstWhere(
+      (x) => x.toLowerCase() == c.toLowerCase(),
+      orElse: () => other,
+    );
+
+    if (match == other) {
+      selectedColor = other;
+      customColorController.text = c; // show the exact saved color
+    } else {
+      selectedColor = match; // use the known color
+      customColorController.clear(); // hide/free custom field
+    }
+
+    // keep SKU in sync
+    updateSku();
   }
 }

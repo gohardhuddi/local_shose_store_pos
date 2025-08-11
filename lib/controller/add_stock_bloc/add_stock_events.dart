@@ -15,6 +15,7 @@ class AddStockToDB extends AddStockEvents {
   final String quantity;
   final String purchasePrice;
   final String suggestedSalePrice;
+  final bool isEdit;
 
   AddStockToDB({
     required this.articleCode,
@@ -26,6 +27,7 @@ class AddStockToDB extends AddStockEvents {
     required this.quantity,
     required this.size,
     required this.suggestedSalePrice,
+    required this.isEdit,
   });
 
   @override
@@ -47,6 +49,14 @@ class GetStockFromDB extends AddStockEvents {
   @override
   List<Object> get props => [];
 }
+
+class DeleteVariantByIdEvent extends AddStockEvents {
+  final String variantID;
+  DeleteVariantByIdEvent({required this.variantID});
+  @override
+  List<Object> get props => [variantID];
+}
+
 class SearchQueryChanged extends AddStockEvents {
   final String query;
   SearchQueryChanged(this.query);

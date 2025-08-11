@@ -1,5 +1,3 @@
-import 'package:sembast/sembast.dart';
-
 abstract class StockDb {
   Future<void> init();
 
@@ -20,10 +18,12 @@ abstract class StockDb {
     required int quantity,
     required double purchasePrice,
     double? salePrice,
+    bool? isEdit,
   });
 
   ///fetch data all
   Future<List<Map<String, dynamic>>> getAllProducts();
   Future<List<Map<String, dynamic>>> getAllVariants();
   Future<String> getAllStock();
+  Future<bool> deleteVariantById(String variantId, {bool hard = false});
 }

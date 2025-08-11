@@ -5,7 +5,7 @@ import '../views/add_stock_screen.dart';
 import '../views/view_stock_screen.dart';
 
 final Map<String, WidgetBuilder> routes = {
-  '/addStockScreen': (context) => const AddStockScreen(),
+  '/addStockScreen': (context) => AddStockScreen(),
   '/viewStockScreen': (context) => const ViewStockScreen(),
   '/': (context) => const HomeScreen(),
 };

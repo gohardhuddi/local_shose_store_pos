@@ -24,6 +24,7 @@ class CustomTextField extends StatelessWidget {
     this.obscureText = false,
     this.validator,
     this.onFieldSubmitted,
+    this.onChanged,
   });
 
   final String? hintText;
@@ -42,10 +43,12 @@ class CustomTextField extends StatelessWidget {
   final bool? obscureText;
   final FormFieldValidator<dynamic>? validator;
   final ValueChanged<String>? onFieldSubmitted;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      onChanged: onChanged,
       onFieldSubmitted: onFieldSubmitted,
       obscureText: obscureText ?? false,
       onTap: onTap,
