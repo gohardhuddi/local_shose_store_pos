@@ -16,10 +16,20 @@ class StockDbSqflite implements StockDb {
     final path = join(dir.path, 'shoe_pos.db');
     _db = await openDatabase(
       path,
-      version:
-          3, // bumped so existing installs get the new soft-delete triggers
+      version: 4, // bumped to 4 for inventory_movement table
       onConfigure: (d) async => await d.execute('PRAGMA foreign_keys = ON;'),
       onCreate: (d, v) async {
+        await d.execute('''
+CREATE TABLE inventory_movements (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  movement_id  TEXT NOT NULL UNIQUE,
+  sku          TEXT NOT NULL,
+  quantity     INTEGER NOT NULL,
+  action       TEXT NOT NULL, -- 'add' or 'subtract'
+  date_time    TEXT NOT NULL,
+  is_synced    INTEGER NOT NULL DEFAULT 0
+);
+''');
         await d.execute('''
 CREATE TABLE products (
   product_id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,6 +62,17 @@ CREATE TABLE product_variants (
 );
 ''');
 
+        await d.execute('''
+CREATE TABLE inventory_movement (
+  movement_id TEXT PRIMARY KEY,
+  sku TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('add', 'subtract')),
+  date_time TEXT NOT NULL,
+  is_synced INTEGER NOT NULL DEFAULT 0
+);
+''');
+
         await d.execute(
           'CREATE INDEX idx_variants_product ON product_variants(product_id);',
         );
@@ -59,34 +80,36 @@ CREATE TABLE product_variants (
           'CREATE INDEX idx_variants_sku ON product_variants(sku);',
         );
 
-        // create triggers (soft-delete product when last active variant disappears, re-activate when needed)
         await _createVariantCleanupTriggers(d);
       },
       onUpgrade: (d, oldV, newV) async {
-        // Ensure triggers/index exist for users upgrading from older versions.
         if (oldV < 2) {
           await _createVariantCleanupTriggers(d);
         }
         if (oldV < 3) {
           await _createVariantCleanupTriggers(d);
         }
+        if (oldV < 4) {
+          await d.execute('''
+CREATE TABLE IF NOT EXISTS inventory_movement (
+  movement_id TEXT PRIMARY KEY,
+  sku TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('add', 'subtract')),
+  date_time TEXT NOT NULL,
+  is_synced INTEGER NOT NULL DEFAULT 0
+);
+''');
+        }
       },
     );
   }
 
-  /// Triggers for soft-delete semantics:
-  /// - When the last ACTIVE variant is removed (hard delete or soft delete), mark product.is_active = 0 and set updated_at.
-  /// - When an ACTIVE variant is inserted or re-activated, mark product.is_active = 1 (reactivate).
   Future<void> _createVariantCleanupTriggers(Database d) async {
-    // For fast "any active variants left?" checks
     await d.execute(
       'CREATE INDEX IF NOT EXISTS idx_variants_product_active ON product_variants(product_id, is_active);',
     );
 
-    // Helper for ISO-8601 UTC timestamp inside SQLite:
-    // strftime('%Y-%m-%dT%H:%M:%fZ','now')  -> e.g. 2025-08-11T07:12:34.123Z
-
-    // HARD delete path: after a variant row is deleted, if no ACTIVE variants remain, SOFT-delete the product.
     await d.execute('''
 CREATE TRIGGER IF NOT EXISTS trg_variant_after_delete_softdelete_product
 AFTER DELETE ON product_variants
@@ -97,15 +120,13 @@ BEGIN
    WHERE products.product_id = OLD.product_id
      AND is_active <> 0
      AND NOT EXISTS (
-       SELECT 1
-         FROM product_variants v
+       SELECT 1 FROM product_variants v
         WHERE v.product_id = OLD.product_id
           AND v.is_active = 1
      );
 END;
 ''');
 
-    // SOFT delete path: after is_active flips from 1 -> 0, if that was the last ACTIVE variant, SOFT-delete the product.
     await d.execute('''
 CREATE TRIGGER IF NOT EXISTS trg_variant_after_softdelete_softdelete_product
 AFTER UPDATE OF is_active ON product_variants
@@ -117,15 +138,13 @@ BEGIN
    WHERE products.product_id = NEW.product_id
      AND is_active <> 0
      AND NOT EXISTS (
-       SELECT 1
-         FROM product_variants v
+       SELECT 1 FROM product_variants v
         WHERE v.product_id = NEW.product_id
           AND v.is_active = 1
      );
 END;
 ''');
 
-    // Reactivate product when an ACTIVE variant is inserted.
     await d.execute('''
 CREATE TRIGGER IF NOT EXISTS trg_variant_after_insert_reactivate_product
 AFTER INSERT ON product_variants
@@ -139,7 +158,6 @@ BEGIN
 END;
 ''');
 
-    // Reactivate product when a variant is re-activated (is_active flips 0 -> 1).
     await d.execute('''
 CREATE TRIGGER IF NOT EXISTS trg_variant_after_reactivate_product
 AFTER UPDATE OF is_active ON product_variants
@@ -203,14 +221,12 @@ END;
     required String colorName,
     String? colorHex,
     required String sku,
-    required int quantity,
+    required int quantity, // still required but ignored in DB
     required double purchasePrice,
     double? salePrice,
-    bool? isEdit, // if true -> replace qty, else add
+    bool? isEdit, // if true -> replace qty, else add (ignored now)
   }) async {
     final now = DateTime.now().toIso8601String();
-    final replaceQty = isEdit ?? false; // treat null as false
-    final qtyExpr = replaceQty ? '?' : 'quantity + ?'; // <— key line
 
     return await db.transaction((txn) async {
       final existing = await txn.query(
@@ -226,25 +242,25 @@ END;
 
         await txn.rawUpdate(
           '''
-        UPDATE product_variants
-           SET product_id     = ?,
-               size_eu        = ?,
-               color_name     = ?,
-               color_hex      = ?,
-               quantity       = $qtyExpr,
-               purchase_price = ?,
-               sale_price     = ?,
-               updated_at     = ?,
-               is_active      = 1,
-               is_synced      = 0
-         WHERE product_variant_id = ?
-        ''',
+      UPDATE product_variants
+         SET product_id     = ?,
+             size_eu        = ?,
+             color_name     = ?,
+             color_hex      = ?,
+             quantity       = ?,  -- hardcoded to 0
+             purchase_price = ?,
+             sale_price     = ?,
+             updated_at     = ?,
+             is_active      = 1,
+             is_synced      = 0
+       WHERE product_variant_id = ?
+      ''',
           [
             int.parse(productId),
             sizeEu,
             colorName,
             colorHex,
-            quantity, // used by $qtyExpr
+            0, // 👈 hardcoded quantity = 0
             purchasePrice,
             salePrice,
             now,
@@ -254,14 +270,14 @@ END;
         return id;
       }
 
-      // Not found -> insert (quantity is whatever you passed in)
+      // Not found -> insert
       final newId = await txn.insert('product_variants', {
         'product_id': int.parse(productId),
         'size_eu': sizeEu,
         'color_name': colorName,
         'color_hex': colorHex,
         'sku': sku,
-        'quantity': quantity,
+        'quantity': 0, // 👈 hardcoded quantity = 0
         'purchase_price': purchasePrice,
         'sale_price': salePrice,
         'created_at': now,
@@ -414,5 +430,45 @@ END;
       );
       return updated > 0;
     }
+  }
+
+  // Add inventory movement
+  Future<String> addInventoryMovement({
+    required String movementId,
+    required String sku,
+    required int quantity,
+    required String action, // 'add' or 'subtract'
+    required String dateTime,
+    bool isSynced = false,
+  }) async {
+    final id = await db.insert('inventory_movements', {
+      'movement_id': movementId,
+      'sku': sku,
+      'quantity': quantity,
+      'action': action,
+      'date_time': dateTime,
+      'is_synced': isSynced ? 1 : 0,
+    });
+    return id.toString();
+  }
+
+  // Get unsynced inventory movements
+  Future<List<Map<String, dynamic>>> getUnsyncedInventoryMovements() async {
+    return await db.query(
+      'inventory_movements',
+      where: 'is_synced = ?',
+      whereArgs: [0],
+    );
+  }
+
+  // Mark a movement as synced
+  Future<bool> markInventoryMovementSynced(String movementId) async {
+    final updated = await db.update(
+      'inventory_movements',
+      {'is_synced': 1},
+      where: 'movement_id = ?',
+      whereArgs: [movementId],
+    );
+    return updated > 0;
   }
 }

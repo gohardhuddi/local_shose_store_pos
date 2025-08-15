@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stream_transform/stream_transform.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../models/stock_model.dart';
 import '../../repository/add_stock_repository.dart';
@@ -41,6 +42,14 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       isEdit: event.isEdit,
     );
     if (productId.isNotEmpty) {
+      var uuid = Uuid();
+      await _addStockRepo.addInventoryMovementRepo(
+        movementId: uuid.v4(),
+        sku: event.productCodeSku,
+        quantity: int.parse(event.quantity),
+        action: "Add",
+        dateTime: DateTime.now().timeZoneOffset.toString(),
+      );
       emit(AddStockSuccessState());
     }
   }

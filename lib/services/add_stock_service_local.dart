@@ -41,4 +41,24 @@ class StockServiceLocal {
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
     return await stockDb.deleteVariantById(variantId);
   }
+
+  Future<String> addInventoryMovement({
+    required String movementId,
+    required String sku,
+    required int quantity,
+    required String action, // 'add' or 'subtract'
+    required String dateTime,
+    bool isSynced = false,
+  }) async {
+    final movementID = await stockDb.addInventoryMovement(
+      movementId: movementId,
+      sku: sku,
+      quantity: quantity,
+      action: action,
+      dateTime: dateTime,
+      isSynced: isSynced,
+    );
+
+    return movementID;
+  }
 }

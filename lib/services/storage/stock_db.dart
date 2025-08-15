@@ -26,4 +26,13 @@ abstract class StockDb {
   Future<List<Map<String, dynamic>>> getAllVariants();
   Future<String> getAllStock();
   Future<bool> deleteVariantById(String variantId, {bool hard = false});
+
+  Future<String> addInventoryMovement({
+    required String movementId,
+    required String sku,
+    required int quantity,
+    required String action, // 'add' or 'subtract'
+    required String dateTime,
+    bool isSynced = false,
+  });
 }

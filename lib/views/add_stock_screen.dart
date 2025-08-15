@@ -114,6 +114,30 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       "Add Stock",
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            thickness: 0.5,
+                            indent: 40,
+                            endIndent: 40,
+                            color: Theme.of(context).dividerColor,
+                          ),
+                        ),
+                        Text(
+                          "Product",
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        Expanded(
+                          child: Divider(
+                            thickness: 0.5,
+                            indent: 40,
+                            endIndent: 40,
+                            color: Theme.of(context).dividerColor,
+                          ),
+                        ),
+                      ],
+                    ),
                     CustomTextField(
                       textEditingController: brandController,
                       labelText: "Brand *",
@@ -136,6 +160,30 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       textEditingController: articleNameController,
                       labelText: "Article Name",
                       hintText: "e.g Adidas Runner",
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            thickness: 0.5,
+                            indent: 40,
+                            endIndent: 40,
+                            color: Theme.of(context).dividerColor,
+                          ),
+                        ),
+                        Text(
+                          "Variant",
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        Expanded(
+                          child: Divider(
+                            thickness: 0.5,
+                            indent: 40,
+                            endIndent: 40,
+                            color: Theme.of(context).dividerColor,
+                          ),
+                        ),
+                      ],
                     ),
                     CustomTextField(
                       textEditingController: sizeController,

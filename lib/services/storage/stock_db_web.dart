@@ -1,18 +1,68 @@
 import 'dart:convert';
 
 import 'package:sembast_web/sembast_web.dart';
+import 'package:uuid/uuid.dart';
 
 import 'stock_db.dart';
 
 class StockDbWeb implements StockDb {
   late final Database _db;
-  final _products = intMapStoreFactory.store('products');
-  final _variants = intMapStoreFactory.store('product_variants');
+  final _products = stringMapStoreFactory.store('products');
+  final _variants = stringMapStoreFactory.store('product_variants');
+  final _movements = stringMapStoreFactory.store('inventory_movements');
 
   @override
   Future<void> init() async {
-    final factory = databaseFactoryWeb; // IndexedDB
+    final factory = databaseFactoryWeb;
     _db = await factory.openDatabase('shoe_pos_web.db');
+  }
+
+  Future<String> addInventoryMovement({
+    required String movementId,
+    required String sku,
+    required int quantity,
+    required String action,
+    required String dateTime,
+    bool isSynced = false,
+  }) async {
+    final existing = await _movements.findFirst(
+      _db,
+      finder: Finder(filter: Filter.equals('movement_id', movementId)),
+    );
+
+    if (existing != null) {
+      return existing.key.toString();
+    }
+
+    final key = movementId; // Use movementId as record key (UUID)
+    await _movements.record(key).put(_db, {
+      'movement_id': movementId,
+      'sku': sku,
+      'quantity': quantity,
+      'action': action,
+      'date_time': dateTime,
+      'is_synced': isSynced ? 1 : 0,
+    });
+
+    return key;
+  }
+
+  Future<List<Map<String, dynamic>>> getUnsyncedMovements() async {
+    final records = await _movements.find(
+      _db,
+      finder: Finder(filter: Filter.equals('is_synced', 0)),
+    );
+    return records.map((r) => {'id': r.key, ...r.value}).toList();
+  }
+
+  Future<void> markMovementSynced(String movementId) async {
+    final record = await _movements.findFirst(
+      _db,
+      finder: Finder(filter: Filter.equals('movement_id', movementId)),
+    );
+    if (record != null) {
+      await _movements.record(record.key).update(_db, {'is_synced': 1});
+    }
   }
 
   @override
@@ -23,6 +73,7 @@ class StockDbWeb implements StockDb {
   }) async {
     final finder = Finder(filter: Filter.equals('article_code', articleCode));
     final now = DateTime.now().toIso8601String();
+    final uuid = Uuid();
 
     final existing = await _products.findFirst(_db, finder: finder);
     if (existing != null) {
@@ -30,12 +81,13 @@ class StockDbWeb implements StockDb {
         'brand': brand,
         'article_name': articleName,
         'updated_at': now,
-        'is_active': 1, // ensure active when edited
+        'is_active': 1,
       });
       return existing.key.toString();
     }
 
-    final key = await _products.add(_db, {
+    final productId = uuid.v4();
+    await _products.record(productId).put(_db, {
       'brand': brand,
       'article_code': articleCode,
       'article_name': articleName,
@@ -43,7 +95,7 @@ class StockDbWeb implements StockDb {
       'created_at': now,
       'updated_at': now,
     });
-    return key.toString();
+    return productId;
   }
 
   @override
@@ -59,6 +111,7 @@ class StockDbWeb implements StockDb {
     bool? isEdit,
   }) async {
     final now = DateTime.now().toIso8601String();
+    final uuid = Uuid();
 
     return await _db.transaction((txn) async {
       final existing = await _variants.findFirst(
@@ -66,13 +119,12 @@ class StockDbWeb implements StockDb {
         finder: Finder(filter: Filter.equals('sku', sku)),
       );
 
-      String pidStr = productId; // stored as string in variants
       if (existing != null) {
-        final existingData = existing.value as Map<String, dynamic>;
+        final existingData = existing.value;
         final currentQty = (existingData['quantity'] as int?) ?? 0;
 
         await _variants.record(existing.key).update(txn, {
-          'product_id': pidStr,
+          'product_id': productId,
           'size_eu': sizeEu,
           'color_name': colorName,
           'color_hex': colorHex,
@@ -80,17 +132,18 @@ class StockDbWeb implements StockDb {
           'purchase_price': purchasePrice,
           'sale_price': salePrice,
           'updated_at': now,
-          'is_active': 1, // treat upsert as (re)activation
+          'is_active': 1,
           'is_synced': 0,
         });
 
-        // Reactivate/ensure product based on active variants
-        await _recomputeProductActive(txn, pidStr);
+        await _recomputeProductActive(txn, productId);
         return existing.key.toString();
       }
 
-      final key = await _variants.add(txn, {
-        'product_id': pidStr,
+      final variantGuid = uuid.v4();
+      await _variants.record(variantGuid).put(txn, {
+        'product_variant_id': variantGuid,
+        'product_id': productId,
         'size_eu': sizeEu,
         'color_name': colorName,
         'color_hex': colorHex,
@@ -104,9 +157,8 @@ class StockDbWeb implements StockDb {
         'is_synced': 0,
       });
 
-      // New active variant -> ensure product is active
-      await _recomputeProductActive(txn, pidStr);
-      return key.toString();
+      await _recomputeProductActive(txn, productId);
+      return variantGuid;
     });
   }
 
@@ -124,12 +176,11 @@ class StockDbWeb implements StockDb {
 
   @override
   Future<String> getAllStock() async {
-    // 1) read all products & variants (one pass each)
     final productRecords = await _products.find(
       _db,
       finder: Finder(
         sortOrders: [SortOrder('article_code')],
-        filter: Filter.equals('is_active', 1), // only active products
+        filter: Filter.equals('is_active', 1),
       ),
     );
 
@@ -137,23 +188,20 @@ class StockDbWeb implements StockDb {
       _db,
       finder: Finder(
         sortOrders: [SortOrder('sku')],
-        filter: Filter.equals('is_active', 1), // only active variants
+        filter: Filter.equals('is_active', 1),
       ),
     );
 
-    // 2) group variants by product_id (avoid N+1 lookups)
     final variantsByPid =
-        <String, List<RecordSnapshot<int, Map<String, Object?>>>>{};
+        <String, List<RecordSnapshot<String, Map<String, Object?>>>>{};
     for (final v in variantRecords) {
       final pid = (v.value['product_id'] ?? '').toString();
-      (variantsByPid[pid] ??= <RecordSnapshot<int, Map<String, Object?>>>[])
-          .add(v);
+      (variantsByPid[pid] ??= []).add(v);
     }
 
-    // 3) build products with attached variants + totals
     final List<Map<String, dynamic>> result = [];
     for (final p in productRecords) {
-      final pid = p.key.toString(); // product_id is the Sembast key
+      final pid = p.key;
       final pv = variantsByPid[pid] ?? const [];
 
       int totalQty = 0;
@@ -165,7 +213,7 @@ class StockDbWeb implements StockDb {
         totalQty += vQty;
 
         variants.add({
-          'variantId': r.key.toString(),
+          'variantId': r.key,
           'sku': (v['sku'] ?? '').toString(),
           'size': v['size_eu'],
           'colorName': (v['color_name'] ?? '').toString(),
@@ -194,30 +242,22 @@ class StockDbWeb implements StockDb {
       });
     }
 
-    // already sorted by article_code via Finder; keep JSON stable
     return jsonEncode(result);
   }
 
-  /// Delete a variant:
-  /// - hard == false: soft delete -> is_active = 0 (+ is_deleted flag, timestamps)
-  /// - hard == true : remove row
-  /// After either path, we recompute product.is_active based on active variants left.
   @override
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
-    final key = int.tryParse(variantId);
-    if (key == null) return false;
-
     return await _db.transaction((txn) async {
-      final snap = await _variants.record(key).getSnapshot(txn);
+      final snap = await _variants.record(variantId).getSnapshot(txn);
       if (snap == null) return false;
 
       final now = DateTime.now().toIso8601String();
       final pidStr = (snap.value['product_id'] ?? '').toString();
 
       if (hard) {
-        await _variants.record(key).delete(txn);
+        await _variants.record(variantId).delete(txn);
       } else {
-        await _variants.record(key).update(txn, {
+        await _variants.record(variantId).update(txn, {
           'is_deleted': 1,
           'is_active': 0,
           'deleted_at': now,
@@ -226,26 +266,17 @@ class StockDbWeb implements StockDb {
         });
       }
 
-      // After the change, recompute product active/soft-delete as needed
       await _recomputeProductActive(txn, pidStr);
       return true;
     });
   }
 
-  // -------------------------
-  // Helpers (Sembast has no triggers)
-  // -------------------------
-
-  /// Set product.is_active based on whether any ACTIVE variants remain.
-  /// - If at least one active variant exists: ensure product is_active = 1
-  /// - If none: soft-delete product (is_active = 0)
   Future<void> _recomputeProductActive(
     DatabaseClient txn,
     String productIdStr,
   ) async {
     final now = DateTime.now().toIso8601String();
 
-    // ✅ Sembast's count() uses `filter:` (not `finder:`)
     final activeCount = await _variants.count(
       txn,
       filter: Filter.and([
@@ -254,10 +285,7 @@ class StockDbWeb implements StockDb {
       ]),
     );
 
-    final pid = int.tryParse(productIdStr);
-    if (pid == null) return; // productId not parseable -> skip
-
-    final rec = _products.record(pid);
+    final rec = _products.record(productIdStr);
 
     if (activeCount > 0) {
       await rec.update(txn, {'is_active': 1, 'updated_at': now});

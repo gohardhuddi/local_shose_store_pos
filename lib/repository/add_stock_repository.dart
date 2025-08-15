@@ -36,4 +36,21 @@ class AddStockRepository {
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
     return await _stockServiceLocal.deleteVariantById(variantId);
   }
+
+  Future<String> addInventoryMovementRepo({
+    required String movementId,
+    required String sku,
+    required int quantity,
+    required String action, // 'add' or 'subtract'
+    required String dateTime,
+    bool isSynced = false,
+  }) async {
+    return await _stockServiceLocal.addInventoryMovement(
+      movementId: movementId,
+      sku: sku,
+      quantity: quantity,
+      action: action,
+      dateTime: dateTime,
+    );
+  }
 }

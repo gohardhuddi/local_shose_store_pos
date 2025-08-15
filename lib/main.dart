@@ -18,6 +18,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   stockDb = StockDbFactory.create();
   await stockDb.init();
+
   runApp(const MyApp());
 }
 
