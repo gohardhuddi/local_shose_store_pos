@@ -1,6 +1,32 @@
-import '../main.dart';
+import '../main.dart'; // expects a global `stockDb` that implements the extended StockDb interface
 
 class StockServiceLocal {
+  // ---------------------------
+  // Helpers
+  // ---------------------------
+  int _parseInt(String label, String value) {
+    final v = int.tryParse(value.trim());
+    if (v == null)
+      throw FormatException('Invalid integer for $label: "$value"');
+    return v;
+  }
+
+  double _parseDouble(String label, String value) {
+    final v = double.tryParse(value.trim());
+    if (v == null) throw FormatException('Invalid number for $label: "$value"');
+    return v;
+  }
+
+  String _normStr(String? s) => (s ?? '').trim();
+  String _normUpper(String s) => s.trim().toUpperCase();
+
+  // ---------------------------
+  // Create / Upsert
+  // ---------------------------
+
+  /// Create or update a product and its variant.
+  /// If `isEdit == true`, quantity is set exactly to `quantity`.
+  /// If `isEdit == false`, quantity is ADDED to the existing quantity.
   Future<String> addStockToDbService({
     required String brand,
     required String articleCode,
@@ -14,51 +40,141 @@ class StockServiceLocal {
     required bool isEdit,
   }) async {
     final productId = await stockDb.upsertProduct(
-      brand: brand.trim(),
-      articleCode: articleCode.toUpperCase(),
-      articleName: articleName?.trim(),
+      brand: _normStr(brand),
+      articleCode: _normUpper(articleCode),
+      articleName: _normStr(articleName),
     );
 
     await stockDb.upsertVariant(
       productId: productId,
-      sizeEu: int.parse(size),
-      colorName: color!,
-      sku: productCodeSku.toUpperCase(),
-      quantity: int.parse(quantity),
-      purchasePrice: double.parse(purchasePrice),
-      salePrice: double.parse(suggestedSalePrice),
+      sizeEu: _parseInt('size', size),
+      colorName: _normStr(color),
+      sku: _normUpper(productCodeSku),
+      quantity: _parseInt('quantity', quantity),
+      purchasePrice: _parseDouble('purchasePrice', purchasePrice),
+      salePrice: _parseDouble('suggestedSalePrice', suggestedSalePrice),
       isEdit: isEdit,
     );
+
     return productId;
   }
 
-  Future<dynamic> getAllStock() async {
-    return await stockDb.getAllStock();
+  // ---------------------------
+  // Edit (metadata + optional quantity change)
+  // ---------------------------
 
-    ///it will return json and all other stuff like join etc and heavy logics are in db class
+  /// Edit an existing variant’s fields. If you also want to change quantity,
+  /// pass `newQuantity`. This will record a movement with the delta.
+  Future<void> editVariantService({
+    required String productId,
+    required String variantID, // product_variant_id (stringified PK)
+    required String size,
+    required String colorName,
+    required String productCodeSku,
+    required String purchasePrice,
+    required String salePrice,
+    String? newQuantity, // optional: if provided, set qty exactly to this value
+    String? movementId, // optional: for idempotency if your UI might retry
+    String? dateTimeIso, // optional: else uses now() in DB layer
+    bool isSynced = false,
+  }) async {
+    await stockDb.editStock(
+      productVariantId: variantID,
+      productId: productId,
+      sizeEu: _parseInt('size', size),
+      colorName: _normStr(colorName),
+      sku: _normUpper(productCodeSku),
+      purchasePrice: _parseDouble('purchasePrice', purchasePrice),
+      salePrice: _parseDouble('salePrice', salePrice),
+      newQuantity: newQuantity == null
+          ? null
+          : _parseInt('newQuantity', newQuantity),
+      movementId: movementId,
+      dateTimeIso: dateTimeIso,
+      isSynced: isSynced,
+    );
   }
 
-  Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
-    return await stockDb.deleteVariantById(variantId);
+  // ---------------------------
+  // Movements (explicit add/subtract) — nice for “Adjust Stock” screen
+  // ---------------------------
+
+  Future<String> addStockMovement({
+    required String movementId,
+    required String productVariantId,
+    required String quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) async {
+    return stockDb.addStock(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: _parseInt('quantity', quantity),
+      dateTimeIso: dateTimeIso,
+      isSynced: isSynced,
+    );
   }
 
+  Future<String> subtractStockMovement({
+    required String movementId,
+    required String productVariantId,
+    required String quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) async {
+    return stockDb.subtractStock(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: _parseInt('quantity', quantity),
+      dateTimeIso: dateTimeIso,
+      isSynced: isSynced,
+    );
+  }
+
+  /// Low-level passthrough (if you really want to call it directly).
   Future<String> addInventoryMovement({
     required String movementId,
-    required String sku,
+    required String productVariantId,
     required int quantity,
     required String action, // 'add' or 'subtract'
     required String dateTime,
     bool isSynced = false,
   }) async {
-    final movementID = await stockDb.addInventoryMovement(
+    return stockDb.addInventoryMovement(
       movementId: movementId,
-      sku: sku,
+      productVariantId: productVariantId,
       quantity: quantity,
       action: action,
       dateTime: dateTime,
       isSynced: isSynced,
     );
+  }
 
-    return movementID;
+  // ---------------------------
+  // Movement sync helpers
+  // ---------------------------
+
+  Future<List<Map<String, dynamic>>> getUnsyncedMovements() {
+    return stockDb.getUnsyncedMovements();
+  }
+
+  Future<void> markMovementSynced(String movementId) {
+    return stockDb.markMovementSynced(movementId);
+  }
+
+  // ---------------------------
+  // Queries / Deletes
+  // ---------------------------
+
+  Future<dynamic> getAllStock() => stockDb.getAllStock();
+
+  Future<List<Map<String, dynamic>>> getAllProducts() =>
+      stockDb.getAllProducts();
+
+  Future<List<Map<String, dynamic>>> getAllVariants() =>
+      stockDb.getAllVariants();
+
+  Future<bool> deleteVariantById(String variantId, {bool hard = false}) {
+    return stockDb.deleteVariantById(variantId, hard: hard);
   }
 }

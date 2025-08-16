@@ -1,3 +1,10 @@
+// stock_db_sqflite.dart
+// SQLite implementation that mirrors the Web (Sembast) version:
+// - Movements table stores product_variant_id (FK), not SKU
+// - Idempotent movements by movement_id
+// - addStock / subtractStock / editStock helpers
+// - Upsert variant respects isEdit (replace qty vs add to qty)
+
 import 'dart:convert';
 
 import 'package:path/path.dart';
@@ -14,22 +21,13 @@ class StockDbSqflite implements StockDb {
   Future<void> init() async {
     final dir = await getApplicationDocumentsDirectory();
     final path = join(dir.path, 'shoe_pos.db');
+
     _db = await openDatabase(
       path,
-      version: 4, // bumped to 4 for inventory_movement table
+      version: 5, // bump to 5 for the corrected inventory_movements schema
       onConfigure: (d) async => await d.execute('PRAGMA foreign_keys = ON;'),
       onCreate: (d, v) async {
-        await d.execute('''
-CREATE TABLE inventory_movements (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  movement_id  TEXT NOT NULL UNIQUE,
-  sku          TEXT NOT NULL,
-  quantity     INTEGER NOT NULL,
-  action       TEXT NOT NULL, -- 'add' or 'subtract'
-  date_time    TEXT NOT NULL,
-  is_synced    INTEGER NOT NULL DEFAULT 0
-);
-''');
+        // ---- Core tables
         await d.execute('''
 CREATE TABLE products (
   product_id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,54 +60,97 @@ CREATE TABLE product_variants (
 );
 ''');
 
+        // ---- Single source of truth for movements (by variant id)
         await d.execute('''
-CREATE TABLE inventory_movement (
-  movement_id TEXT PRIMARY KEY,
-  sku TEXT NOT NULL,
-  quantity INTEGER NOT NULL,
-  action TEXT NOT NULL CHECK (action IN ('add', 'subtract')),
-  date_time TEXT NOT NULL,
-  is_synced INTEGER NOT NULL DEFAULT 0
+CREATE TABLE inventory_movements (
+  movement_id        TEXT PRIMARY KEY,
+  product_variant_id INTEGER NOT NULL,
+  quantity           INTEGER NOT NULL CHECK (quantity > 0),
+  action             TEXT NOT NULL CHECK (action IN ('add','subtract')),
+  date_time          TEXT NOT NULL,
+  is_synced          INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY(product_variant_id) REFERENCES product_variants(product_variant_id) ON DELETE CASCADE
 );
 ''');
 
+        // ---- Indexes
         await d.execute(
           'CREATE INDEX idx_variants_product ON product_variants(product_id);',
         );
         await d.execute(
-          'CREATE INDEX idx_variants_sku ON product_variants(sku);',
+          'CREATE INDEX idx_variants_active ON product_variants(product_id, is_active);',
         );
-
+        await d.execute(
+          'CREATE INDEX idx_movements_variant ON inventory_movements(product_variant_id);',
+        );
         await _createVariantCleanupTriggers(d);
       },
       onUpgrade: (d, oldV, newV) async {
-        if (oldV < 2) {
-          await _createVariantCleanupTriggers(d);
-        }
-        if (oldV < 3) {
-          await _createVariantCleanupTriggers(d);
-        }
-        if (oldV < 4) {
-          await d.execute('''
-CREATE TABLE IF NOT EXISTS inventory_movement (
-  movement_id TEXT PRIMARY KEY,
-  sku TEXT NOT NULL,
-  quantity INTEGER NOT NULL,
-  action TEXT NOT NULL CHECK (action IN ('add', 'subtract')),
-  date_time TEXT NOT NULL,
-  is_synced INTEGER NOT NULL DEFAULT 0
+        // ensure base tables exist
+        await d.execute('''
+CREATE TABLE IF NOT EXISTS products (
+  product_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand          TEXT NOT NULL,
+  article_code   TEXT NOT NULL UNIQUE,
+  article_name   TEXT,
+  notes          TEXT,
+  is_active      INTEGER NOT NULL DEFAULT 1,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL
 );
 ''');
+
+        await d.execute('''
+CREATE TABLE IF NOT EXISTS product_variants (
+  product_variant_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id         INTEGER NOT NULL,
+  size_eu            INTEGER NOT NULL,
+  color_name         TEXT NOT NULL,
+  color_hex          TEXT,
+  sku                TEXT NOT NULL UNIQUE,
+  quantity           INTEGER NOT NULL DEFAULT 0,
+  purchase_price     REAL NOT NULL DEFAULT 0,
+  sale_price         REAL,
+  is_active          INTEGER NOT NULL DEFAULT 1,
+  is_synced          INTEGER NOT NULL DEFAULT 0,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL,
+  FOREIGN KEY(product_id) REFERENCES products(product_id) ON DELETE CASCADE
+);
+''');
+
+        // migrate to the corrected movements table
+        if (oldV < 5) {
+          await d.execute('''
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  movement_id        TEXT PRIMARY KEY,
+  product_variant_id INTEGER NOT NULL,
+  quantity           INTEGER NOT NULL CHECK (quantity > 0),
+  action             TEXT NOT NULL CHECK (action IN ('add','subtract')),
+  date_time          TEXT NOT NULL,
+  is_synced          INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY(product_variant_id) REFERENCES product_variants(product_variant_id) ON DELETE CASCADE
+);
+''');
+          await d.execute(
+            'CREATE INDEX IF NOT EXISTS idx_movements_variant ON inventory_movements(product_variant_id);',
+          );
         }
+
+        await d.execute(
+          'CREATE INDEX IF NOT EXISTS idx_variants_product ON product_variants(product_id);',
+        );
+        await d.execute(
+          'CREATE INDEX IF NOT EXISTS idx_variants_active ON product_variants(product_id, is_active);',
+        );
+
+        await _createVariantCleanupTriggers(d);
       },
     );
   }
 
   Future<void> _createVariantCleanupTriggers(Database d) async {
-    await d.execute(
-      'CREATE INDEX IF NOT EXISTS idx_variants_product_active ON product_variants(product_id, is_active);',
-    );
-
+    // keep your existing nice triggers
     await d.execute('''
 CREATE TRIGGER IF NOT EXISTS trg_variant_after_delete_softdelete_product
 AFTER DELETE ON product_variants
@@ -172,6 +213,9 @@ END;
 ''');
   }
 
+  // -------------------------
+  // Products
+  // -------------------------
   @override
   Future<String> upsertProduct({
     required String brand,
@@ -179,6 +223,7 @@ END;
     String? articleName,
   }) async {
     final now = DateTime.now().toIso8601String();
+
     final existing = await db.query(
       'products',
       columns: ['product_id'],
@@ -214,70 +259,88 @@ END;
     return id.toString();
   }
 
+  // -------------------------
+  // Variants (create/update)
+  // -------------------------
   @override
   Future<String> upsertVariant({
     required String productId,
+    String? variantID, // when provided, update by this PK; else insert
     required int sizeEu,
     required String colorName,
     String? colorHex,
-    required String sku,
-    required int quantity, // still required but ignored in DB
+    required String sku, // unique
+    required int quantity,
     required double purchasePrice,
     double? salePrice,
-    bool? isEdit, // if true -> replace qty, else add (ignored now)
+    bool? isEdit, // if true: set quantity exactly; else add to current
   }) async {
     final now = DateTime.now().toIso8601String();
 
     return await db.transaction((txn) async {
-      final existing = await txn.query(
-        'product_variants',
-        columns: ['product_variant_id'],
-        where: 'sku = ?',
-        whereArgs: [sku],
-        limit: 1,
-      );
+      Map<String, Object?>? row;
+      String? existingId;
 
-      if (existing.isNotEmpty) {
-        final id = existing.first['product_variant_id'].toString();
-
-        await txn.rawUpdate(
-          '''
-      UPDATE product_variants
-         SET product_id     = ?,
-             size_eu        = ?,
-             color_name     = ?,
-             color_hex      = ?,
-             quantity       = ?,  -- hardcoded to 0
-             purchase_price = ?,
-             sale_price     = ?,
-             updated_at     = ?,
-             is_active      = 1,
-             is_synced      = 0
-       WHERE product_variant_id = ?
-      ''',
-          [
-            int.parse(productId),
-            sizeEu,
-            colorName,
-            colorHex,
-            0, // 👈 hardcoded quantity = 0
-            purchasePrice,
-            salePrice,
-            now,
-            id,
-          ],
+      if (variantID != null) {
+        final q = await txn.query(
+          'product_variants',
+          where: 'product_variant_id = ?',
+          whereArgs: [int.tryParse(variantID)],
+          limit: 1,
         );
-        return id;
+        if (q.isNotEmpty) {
+          row = q.first;
+          existingId = row['product_variant_id'].toString();
+        }
+      } else {
+        final q = await txn.query(
+          'product_variants',
+          where: 'sku = ?',
+          whereArgs: [sku],
+          limit: 1,
+        );
+        if (q.isNotEmpty) {
+          row = q.first;
+          existingId = row['product_variant_id'].toString();
+        }
       }
 
-      // Not found -> insert
+      if (existingId != null) {
+        // Update existing
+        final currentQty = (row?['quantity'] as int?) ?? 0;
+        final nextQty = (isEdit == true) ? quantity : (currentQty + quantity);
+
+        await txn.update(
+          'product_variants',
+          {
+            'product_id': int.parse(productId),
+            'size_eu': sizeEu,
+            'color_name': colorName,
+            'color_hex': colorHex,
+            'sku': sku,
+            'quantity': nextQty,
+            'purchase_price': purchasePrice,
+            'sale_price': salePrice,
+            'updated_at': now,
+            'is_active': 1,
+            'is_synced': 0,
+          },
+          where: 'product_variant_id = ?',
+          whereArgs: [int.parse(existingId)],
+        );
+
+        await _recomputeProductActiveTx(txn, productId);
+        return existingId;
+      }
+
+      // Insert new
       final newId = await txn.insert('product_variants', {
         'product_id': int.parse(productId),
         'size_eu': sizeEu,
         'color_name': colorName,
         'color_hex': colorHex,
         'sku': sku,
-        'quantity': 0, // 👈 hardcoded quantity = 0
+        'quantity': quantity,
         'purchase_price': purchasePrice,
         'sale_price': salePrice,
         'created_at': now,
@@ -285,10 +348,249 @@ END;
         'is_active': 1,
         'is_synced': 0,
       });
+
+      await _recomputeProductActiveTx(txn, productId);
       return newId.toString();
     });
   }
 
+  // -------------------------
+  // Movements (core primitive + helpers)
+  // -------------------------
+
+  /// Core primitive identical to Web version: apply a movement (idempotent).
+  Future<String> addInventoryMovement({
+    required String movementId,
+    required String productVariantId, // variant PK (stringified int)
+    required int quantity,
+    required String action, // 'add' or 'subtract'
+    required String dateTime,
+    bool isSynced = false,
+  }) async {
+    final normalizedAction = action.toLowerCase().trim();
+    final isAdd = normalizedAction == 'add';
+    final isSubtract = normalizedAction == 'subtract';
+    if (!isAdd && !isSubtract) {
+      throw ArgumentError.value(
+        action,
+        'action',
+        'Must be "add" or "subtract"',
+      );
+    }
+    if (quantity <= 0) {
+      throw ArgumentError.value(quantity, 'quantity', 'Must be > 0');
+    }
+
+    return await db.transaction((txn) async {
+      // 1) idempotency
+      final prior = await txn.query(
+        'inventory_movements',
+        columns: ['movement_id'],
+        where: 'movement_id = ?',
+        whereArgs: [movementId],
+        limit: 1,
+      );
+      if (prior.isNotEmpty) return movementId;
+
+      // 2) load variant
+      final vid = int.tryParse(productVariantId);
+      if (vid == null) throw ArgumentError('Invalid productVariantId');
+      final v = await txn.query(
+        'product_variants',
+        where: 'product_variant_id = ?',
+        whereArgs: [vid],
+        limit: 1,
+      );
+      if (v.isEmpty) throw StateError('Variant not found: $productVariantId');
+
+      final currentQty = (v.first['quantity'] as int?) ?? 0;
+      final delta = isAdd ? quantity : -quantity;
+      final newQty = currentQty + delta;
+      if (newQty < 0) {
+        throw StateError(
+          'Insufficient stock for variant $productVariantId: current=$currentQty, subtract=$quantity',
+        );
+      }
+
+      // 3) update variant
+      final now = DateTime.now().toIso8601String();
+      await txn.update(
+        'product_variants',
+        {'quantity': newQty, 'updated_at': now, 'is_synced': 0},
+        where: 'product_variant_id = ?',
+        whereArgs: [vid],
+      );
+
+      // 4) write movement
+      await txn.insert('inventory_movements', {
+        'movement_id': movementId,
+        'product_variant_id': vid,
+        'quantity': quantity,
+        'action': isAdd ? 'add' : 'subtract',
+        'date_time': dateTime,
+        'is_synced': isSynced ? 1 : 0,
+      });
+
+      // 5) recompute product active
+      final pid = (v.first['product_id'] ?? '').toString();
+      if (pid.isNotEmpty) {
+        await _recomputeProductActiveTx(txn, pid);
+      }
+
+      return movementId;
+    });
+  }
+
+  /// Increase quantity (records a movement).
+  Future<String> addStock({
+    required String movementId,
+    required String productVariantId,
+    required int quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) {
+    return addInventoryMovement(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: quantity,
+      action: 'add',
+      dateTime: dateTimeIso ?? DateTime.now().toIso8601String(),
+      isSynced: isSynced,
+    );
+  }
+
+  /// Decrease quantity (records a movement).
+  Future<String> subtractStock({
+    required String movementId,
+    required String productVariantId,
+    required int quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) {
+    return addInventoryMovement(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: quantity,
+      action: 'subtract',
+      dateTime: dateTimeIso ?? DateTime.now().toIso8601String(),
+      isSynced: isSynced,
+    );
+  }
+
+  /// Edit metadata and/or set quantity exactly; logs movement if qty changed.
+  Future<void> editStock({
+    required String productVariantId,
+    String? productId,
+    int? sizeEu,
+    String? colorName,
+    String? colorHex,
+    String? sku,
+    double? purchasePrice,
+    double? salePrice,
+    int? newQuantity,
+    String? movementId,
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final when = dateTimeIso ?? now;
+
+    await db.transaction((txn) async {
+      final vid = int.tryParse(productVariantId);
+      if (vid == null) throw ArgumentError('Invalid productVariantId');
+
+      final q = await txn.query(
+        'product_variants',
+        where: 'product_variant_id = ?',
+        whereArgs: [vid],
+        limit: 1,
+      );
+      if (q.isEmpty) throw StateError('Variant not found: $productVariantId');
+
+      final data = q.first;
+      final currentQty = (data['quantity'] as int?) ?? 0;
+
+      int? delta;
+      if (newQuantity != null) {
+        if (newQuantity < 0) {
+          throw ArgumentError.value(newQuantity, 'newQuantity', 'Must be >= 0');
+        }
+        delta = newQuantity - currentQty;
+        if (currentQty + delta < 0) {
+          throw StateError('Resulting quantity would be negative');
+        }
+      }
+
+      final update = <String, Object?>{
+        if (productId != null) 'product_id': int.parse(productId),
+        if (sizeEu != null) 'size_eu': sizeEu,
+        if (colorName != null) 'color_name': colorName,
+        if (colorHex != null) 'color_hex': colorHex,
+        if (sku != null) 'sku': sku,
+        if (purchasePrice != null) 'purchase_price': purchasePrice,
+        if (salePrice != null) 'sale_price': salePrice,
+        if (newQuantity != null) 'quantity': newQuantity,
+        'updated_at': now,
+        'is_synced': 0,
+        'is_active': 1,
+      };
+
+      await txn.update(
+        'product_variants',
+        update,
+        where: 'product_variant_id = ?',
+        whereArgs: [vid],
+      );
+
+      if (delta != null && delta != 0) {
+        final id =
+            movementId ?? DateTime.now().microsecondsSinceEpoch.toString();
+        final action = delta > 0 ? 'add' : 'subtract';
+        final magnitude = delta.abs();
+
+        final prior = await txn.query(
+          'inventory_movements',
+          columns: ['movement_id'],
+          where: 'movement_id = ?',
+          whereArgs: [id],
+          limit: 1,
+        );
+        if (prior.isEmpty) {
+          await txn.insert('inventory_movements', {
+            'movement_id': id,
+            'product_variant_id': vid,
+            'quantity': magnitude,
+            'action': action,
+            'date_time': when,
+            'is_synced': isSynced ? 1 : 0,
+          });
+        }
+      }
+
+      final pidForRecompute = (update['product_id'] ?? data['product_id'])
+          .toString();
+      await _recomputeProductActiveTx(txn, pidForRecompute);
+    });
+  }
+
+  // ---- Movement sync helpers (same shape as Web)
+  Future<List<Map<String, dynamic>>> getUnsyncedMovements() async {
+    return await db.query('inventory_movements', where: 'is_synced = 0');
+    // returns rows with: movement_id, product_variant_id, quantity, action, date_time, is_synced
+  }
+
+  Future<void> markMovementSynced(String movementId) async {
+    await db.update(
+      'inventory_movements',
+      {'is_synced': 1},
+      where: 'movement_id = ?',
+      whereArgs: [movementId],
+    );
+  }
+
+  // -------------------------
+  // Queries / Reporting
+  // -------------------------
   @override
   Future<List<Map<String, dynamic>>> getAllProducts() async {
     return await db.query('products');
@@ -301,28 +603,7 @@ END;
 
   @override
   Future<String> getAllStock() async {
-    final now = DateTime.now().toIso8601String();
-
-    return await db.transaction((txn) async {
-      // 1) soft-deactivate products that have zero ACTIVE variants
-      await txn.rawUpdate(
-        '''
-      UPDATE products AS p
-         SET is_active = 0,
-             updated_at = ?
-       WHERE is_active <> 0
-         AND NOT EXISTS (
-           SELECT 1
-             FROM product_variants v
-            WHERE v.product_id = p.product_id
-              AND v.is_active = 1
-         )
-    ''',
-        [now],
-      );
-
-      // 2) query ONLY active products with at least one ACTIVE variant
-      final rows = await txn.rawQuery('''
+    final rows = await db.rawQuery('''
       SELECT
         p.product_id         AS p_id,
         p.brand              AS p_brand,
@@ -352,62 +633,58 @@ END;
       ORDER BY p.article_code ASC, v.sku ASC
     ''');
 
-      // 3) group by product, attach variants
-      final byId = <String, Map<String, dynamic>>{};
-      for (final r in rows) {
-        final pid = r['p_id'].toString();
-        final product = byId.putIfAbsent(
-          pid,
-          () => {
-            'productId': pid,
-            'brand': (r['p_brand'] ?? '').toString(),
-            'articleCode': (r['p_code'] ?? '').toString(),
-            'articleName': (r['p_name'] ?? '').toString(),
-            'isActive': true, // filtered above
-            'createdAt': r['p_created'],
-            'updatedAt': r['p_updated'],
-            'totalQty': 0,
-            'variantCount': 0,
-            'variants': <Map<String, dynamic>>[],
-          },
-        );
+    final byId = <String, Map<String, dynamic>>{};
+    for (final r in rows) {
+      final pid = r['p_id'].toString();
+      final product = byId.putIfAbsent(
+        pid,
+        () => {
+          'productId': pid,
+          'brand': (r['p_brand'] ?? '').toString(),
+          'articleCode': (r['p_code'] ?? '').toString(),
+          'articleName': (r['p_name'] ?? '').toString(),
+          'isActive': (r['p_active'] ?? 1) == 1,
+          'createdAt': r['p_created'],
+          'updatedAt': r['p_updated'],
+          'totalQty': 0,
+          'variantCount': 0,
+          'variants': <Map<String, dynamic>>[],
+        },
+      );
 
-        final vQty = (r['v_qty'] as int?) ?? 0;
-        final variant = {
-          'variantId': r['v_id'].toString(),
-          'sku': (r['v_sku'] ?? '').toString(),
-          'size': r['v_size'],
-          'colorName': (r['v_color_name'] ?? '').toString(),
-          'colorHex': r['v_color_hex'],
-          'qty': vQty,
-          'purchasePrice': (r['v_purchase'] as num?)?.toDouble(),
-          'salePrice': (r['v_sale'] as num?)?.toDouble(),
-          'isActive': true, // filtered above
-          'isSynced': (r['v_synced'] ?? 0) == 1,
-          'createdAt': r['v_created'],
-          'updatedAt': r['v_updated'],
-        };
+      final vQty = (r['v_qty'] as int?) ?? 0;
+      final variant = {
+        'variantId': r['v_id'].toString(),
+        'sku': (r['v_sku'] ?? '').toString(),
+        'size': r['v_size'],
+        'colorName': (r['v_color_name'] ?? '').toString(),
+        'colorHex': r['v_color_hex'],
+        'qty': vQty,
+        'purchasePrice': (r['v_purchase'] as num?)?.toDouble(),
+        'salePrice': (r['v_sale'] as num?)?.toDouble(),
+        'isActive': (r['v_active'] ?? 1) == 1,
+        'isSynced': (r['v_synced'] ?? 0) == 1,
+        'createdAt': r['v_created'],
+        'updatedAt': r['v_updated'],
+      };
 
-        (product['variants'] as List).add(variant);
-        product['totalQty'] = (product['totalQty'] as int) + vQty;
-        product['variantCount'] = (product['variantCount'] as int) + 1;
-      }
+      (product['variants'] as List).add(variant);
+      product['totalQty'] = (product['totalQty'] as int) + vQty;
+      product['variantCount'] = (product['variantCount'] as int) + 1;
+    }
 
-      final list = byId.values.toList()
-        ..sort(
-          (a, b) => (a['articleCode'] as String).compareTo(
-            b['articleCode'] as String,
-          ),
-        );
+    final list = byId.values.toList()
+      ..sort(
+        (a, b) =>
+            (a['articleCode'] as String).compareTo(b['articleCode'] as String),
+      );
 
-      return jsonEncode(list);
-    });
+    return jsonEncode(list);
   }
 
-  /// Delete a variant by its primary key.
-  /// - hard == false: Soft delete (is_active = 0, updated_at, is_synced = 0).
-  /// - hard == true : Hard delete (row removed).
-  /// Triggers will soft-delete the product when the last ACTIVE variant is gone.
+  // -------------------------
+  // Deletes
+  // -------------------------
   @override
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
     final key = int.tryParse(variantId);
@@ -432,43 +709,37 @@ END;
     }
   }
 
-  // Add inventory movement
-  Future<String> addInventoryMovement({
-    required String movementId,
-    required String sku,
-    required int quantity,
-    required String action, // 'add' or 'subtract'
-    required String dateTime,
-    bool isSynced = false,
-  }) async {
-    final id = await db.insert('inventory_movements', {
-      'movement_id': movementId,
-      'sku': sku,
-      'quantity': quantity,
-      'action': action,
-      'date_time': dateTime,
-      'is_synced': isSynced ? 1 : 0,
-    });
-    return id.toString();
-  }
+  // -------------------------
+  // Internal helpers
+  // -------------------------
+  Future<void> _recomputeProductActiveTx(
+    Transaction txn,
+    String productIdStr,
+  ) async {
+    final pid = int.tryParse(productIdStr);
+    if (pid == null) return;
 
-  // Get unsynced inventory movements
-  Future<List<Map<String, dynamic>>> getUnsyncedInventoryMovements() async {
-    return await db.query(
-      'inventory_movements',
-      where: 'is_synced = ?',
-      whereArgs: [0],
+    final cnt =
+        Sqflite.firstIntValue(
+          await txn.rawQuery(
+            'SELECT COUNT(*) FROM product_variants WHERE product_id = ? AND is_active = 1',
+            [pid],
+          ),
+        ) ??
+        0;
+
+    final now = DateTime.now().toIso8601String();
+    await txn.update(
+      'products',
+      {'is_active': cnt > 0 ? 1 : 0, 'updated_at': now},
+      where: 'product_id = ?',
+      whereArgs: [pid],
     );
   }
 
-  // Mark a movement as synced
-  Future<bool> markInventoryMovementSynced(String movementId) async {
-    final updated = await db.update(
-      'inventory_movements',
-      {'is_synced': 1},
-      where: 'movement_id = ?',
-      whereArgs: [movementId],
+  Future<void> _recomputeProductActive(String productIdStr) async {
+    await db.transaction(
+      (txn) async => _recomputeProductActiveTx(txn, productIdStr),
     );
-    return updated > 0;
   }
 }

@@ -3,6 +3,11 @@ import 'package:local_shoes_store_pos/services/add_stock_service_local.dart';
 class AddStockRepository {
   final StockServiceLocal _stockServiceLocal;
   AddStockRepository(this._stockServiceLocal);
+
+  // ---------------------------
+  // Create / Upsert
+  // ---------------------------
+
   Future<String> addStockToDBRepo({
     required String brand,
     required String articleCode,
@@ -14,7 +19,7 @@ class AddStockRepository {
     required String purchasePrice,
     required String suggestedSalePrice,
     required bool isEdit,
-  }) async {
+  }) {
     return _stockServiceLocal.addStockToDbService(
       brand: brand,
       articleCode: articleCode,
@@ -29,28 +34,115 @@ class AddStockRepository {
     );
   }
 
-  Future<dynamic> getAllStockRepo() async {
-    return await _stockServiceLocal.getAllStock();
+  // ---------------------------
+  // Edit (metadata + optional quantity change)
+  // ---------------------------
+
+  /// If you want to also change quantity, pass `newQuantity`.
+  /// A movement will be recorded with the delta.
+  Future<void> editVariantRepo({
+    required String productID,
+    required String variantID,
+    required String size,
+    required String color,
+    required String productCodeSku,
+    required String purchasePrice,
+    required String suggestedSalePrice,
+    String? newQuantity, // optional exact quantity to set
+    String? movementId, // optional for idempotency
+    String? dateTimeIso, // optional timestamp
+    bool isSynced = false,
+  }) {
+    return _stockServiceLocal.editVariantService(
+      productId: productID,
+      variantID: variantID,
+      size: size,
+      colorName: color,
+      productCodeSku: productCodeSku,
+      purchasePrice: purchasePrice,
+      salePrice: suggestedSalePrice,
+      newQuantity: newQuantity,
+      movementId: movementId,
+      dateTimeIso: dateTimeIso,
+      isSynced: isSynced,
+    );
   }
 
-  Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
-    return await _stockServiceLocal.deleteVariantById(variantId);
+  // ---------------------------
+  // Movements (explicit add/subtract)
+  // ---------------------------
+
+  Future<String> addStockMovementRepo({
+    required String movementId,
+    required String productVariantId,
+    required String quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) {
+    return _stockServiceLocal.addStockMovement(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: quantity,
+      dateTimeIso: dateTimeIso,
+      isSynced: isSynced,
+    );
   }
 
+  Future<String> subtractStockMovementRepo({
+    required String movementId,
+    required String productVariantId,
+    required String quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) {
+    return _stockServiceLocal.subtractStockMovement(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: quantity,
+      dateTimeIso: dateTimeIso,
+      isSynced: isSynced,
+    );
+  }
+
+  /// Optional: keep the low-level passthrough for special cases.
   Future<String> addInventoryMovementRepo({
     required String movementId,
-    required String sku,
+    required String productVariantId,
     required int quantity,
     required String action, // 'add' or 'subtract'
     required String dateTime,
     bool isSynced = false,
-  }) async {
-    return await _stockServiceLocal.addInventoryMovement(
+  }) {
+    return _stockServiceLocal.addInventoryMovement(
       movementId: movementId,
-      sku: sku,
+      productVariantId: productVariantId,
       quantity: quantity,
       action: action,
       dateTime: dateTime,
+      isSynced: isSynced,
     );
+  }
+
+  // ---------------------------
+  // Queries / Sync / Deletes
+  // ---------------------------
+
+  Future<dynamic> getAllStockRepo() => _stockServiceLocal.getAllStock();
+
+  Future<List<Map<String, dynamic>>> getAllProductsRepo() =>
+      _stockServiceLocal.getAllProducts();
+
+  Future<List<Map<String, dynamic>>> getAllVariantsRepo() =>
+      _stockServiceLocal.getAllVariants();
+
+  Future<List<Map<String, dynamic>>> getUnsyncedMovementsRepo() =>
+      _stockServiceLocal.getUnsyncedMovements();
+
+  Future<void> markMovementSyncedRepo(String movementId) =>
+      _stockServiceLocal.markMovementSynced(movementId);
+
+  Future<bool> deleteVariantById(String variantId, {bool hard = false}) {
+    // Forward the 'hard' flag (previously ignored).
+    return _stockServiceLocal.deleteVariantById(variantId, hard: hard);
   }
 }

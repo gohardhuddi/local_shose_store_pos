@@ -6,6 +6,7 @@ import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_states
 import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/models/stock_model.dart';
 import 'package:local_shoes_store_pos/views/add_stock_screen.dart';
+import 'package:local_shoes_store_pos/views/edit_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
 class ViewStockScreen extends StatefulWidget {
@@ -148,7 +149,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                                   onPressed: () {
                                                     PersistentNavBarNavigator.pushNewScreen(
                                                       context,
-                                                      screen: AddStockScreen(
+                                                      screen: EditStockScreen(
                                                         stock: p,
                                                         varient: v,
                                                       ),

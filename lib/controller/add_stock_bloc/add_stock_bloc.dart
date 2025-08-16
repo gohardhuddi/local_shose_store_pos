@@ -16,6 +16,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
 
   AddStockBloc(this._addStockRepo) : super(AddStockInitialState()) {
     on<AddStockToDB>(_onAddStockToDB);
+    on<EditStockVariant>(_onEditVariant);
     on<GetStockFromDB>(_onGetAllStock);
     on<DeleteVariantByIdEvent>(_onDeleteVariantById);
     on<SearchQueryChanged>(
@@ -29,7 +30,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
     Emitter<AddStockStates> emit,
   ) async {
     emit(AddStockLoadingState());
-    final productId = await _addStockRepo.addStockToDBRepo(
+    await _addStockRepo.addStockToDBRepo(
       brand: event.brand,
       articleCode: event.articleCode,
       articleName: event.articleName,
@@ -41,17 +42,42 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       suggestedSalePrice: event.suggestedSalePrice,
       isEdit: event.isEdit,
     );
-    if (productId.isNotEmpty) {
-      var uuid = Uuid();
-      await _addStockRepo.addInventoryMovementRepo(
-        movementId: uuid.v4(),
-        sku: event.productCodeSku,
-        quantity: int.parse(event.quantity),
-        action: "Add",
-        dateTime: DateTime.now().timeZoneOffset.toString(),
-      );
-      emit(AddStockSuccessState());
-    }
+
+    // Optionally reload list here if your UI expects fresh data:
+    // await _reloadStock(emit);
+
+    emit(AddStockSuccessState());
+  }
+
+  Future<void> _onEditVariant(
+    EditStockVariant event,
+    Emitter<AddStockStates> emit,
+  ) async {
+    emit(AddStockLoadingState());
+
+    // Let DB layer handle movement logging based on quantity delta.
+    final movementId = const Uuid().v4();
+    await _addStockRepo.editVariantRepo(
+      size: event.size,
+      color: event.color,
+      productCodeSku: event.productCodeSku,
+      purchasePrice: event.purchasePrice,
+      suggestedSalePrice: event.suggestedSalePrice,
+      productID: event.productID,
+      variantID: event.variantID,
+      // If you want to set quantity exactly to event.quantity:
+      newQuantity: event.quantity, // ← triggers movement if changed
+      movementId: movementId, // ← idempotency
+      dateTimeIso: DateTime.now().toIso8601String(),
+      isSynced: false,
+    );
+
+    // No need to call addInventoryMovementRepo manually anymore.
+
+    // Optionally reload list:
+    // await _reloadStock(emit);
+
+    emit(AddStockSuccessState());
   }
 
   Future<void> _onGetAllStock(
@@ -60,9 +86,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
   ) async {
     emit(AddStockLoadingState());
     final json = await _addStockRepo.getAllStockRepo();
-    print(json);
     _all = StockModel.listFromJsonString(json);
-
     emit(GetStockFromDBSuccessState(stockList: _all, query: ''));
   }
 
@@ -72,6 +96,9 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
   ) async {
     emit(AddStockLoadingState());
     await _addStockRepo.deleteVariantById(event.variantID);
+
+    // Optionally reload list:
+    // await _reloadStock(emit);
 
     emit(DeleteVariantByIdSuccessState());
   }
@@ -91,6 +118,13 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       temp = _all;
     }
     emit(GetStockFromDBSuccessState(stockList: temp, query: e.query));
+  }
+
+  // Handy if you want to refresh the list after add/edit/delete
+  Future<void> _reloadStock(Emitter<AddStockStates> emit) async {
+    final json = await _addStockRepo.getAllStockRepo();
+    _all = StockModel.listFromJsonString(json);
+    emit(GetStockFromDBSuccessState(stockList: _all, query: ''));
   }
 
   List<String> _tokenize(String q) => q

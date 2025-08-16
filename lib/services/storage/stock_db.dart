@@ -1,16 +1,26 @@
 abstract class StockDb {
   Future<void> init();
 
-  /// returns productId
+  // -------------------------
+  // Products
+  // -------------------------
+  /// Returns productId (stringified)
   Future<String> upsertProduct({
     required String brand,
     required String articleCode, // unique key (e.g., ADSH001)
     String? articleName,
   });
 
-  /// returns variantId
+  // -------------------------
+  // Variants
+  // -------------------------
+  /// Returns variantId (stringified)
+  /// If variantID is provided, update that variant.
+  /// Otherwise, upsert by SKU.
+  /// If isEdit == true, quantity is set exactly; else quantity is added to current.
   Future<String> upsertVariant({
     required String productId,
+    String? variantID,
     required int sizeEu,
     required String colorName,
     String? colorHex,
@@ -21,18 +31,69 @@ abstract class StockDb {
     bool? isEdit,
   });
 
-  ///fetch data all
-  Future<List<Map<String, dynamic>>> getAllProducts();
-  Future<List<Map<String, dynamic>>> getAllVariants();
-  Future<String> getAllStock();
-  Future<bool> deleteVariantById(String variantId, {bool hard = false});
-
+  // -------------------------
+  // Movements (core primitive)
+  // -------------------------
+  /// Apply a stock movement to a variant. Must be idempotent by movementId.
   Future<String> addInventoryMovement({
     required String movementId,
-    required String sku,
-    required int quantity,
+    required String productVariantId, // variant id, not SKU (stringified)
+    required int quantity, // > 0
     required String action, // 'add' or 'subtract'
-    required String dateTime,
+    required String dateTime, // ISO-8601
     bool isSynced = false,
   });
+
+  // -------------------------
+  // Movement helpers (recommended)
+  // -------------------------
+  /// Convenience wrappers for add/subtract movements.
+  Future<String> addStock({
+    required String movementId,
+    required String productVariantId,
+    required int quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  });
+
+  Future<String> subtractStock({
+    required String movementId,
+    required String productVariantId,
+    required int quantity,
+    String? dateTimeIso,
+    bool isSynced = false,
+  });
+
+  /// Edit metadata (size/color/sku/prices) and/or set quantity exactly.
+  /// If quantity changes, log a movement with the delta.
+  Future<void> editStock({
+    required String productVariantId,
+    String? productId,
+    int? sizeEu,
+    String? colorName,
+    String? colorHex,
+    String? sku,
+    double? purchasePrice,
+    double? salePrice,
+    int? newQuantity,
+    String? movementId,
+    String? dateTimeIso,
+    bool isSynced = false,
+  });
+
+  /// Movement sync helpers (optional but useful for an offline-first pipeline)
+  Future<List<Map<String, dynamic>>> getUnsyncedMovements();
+  Future<void> markMovementSynced(String movementId);
+
+  // -------------------------
+  // Queries / Reporting
+  // -------------------------
+  Future<List<Map<String, dynamic>>> getAllProducts();
+  Future<List<Map<String, dynamic>>> getAllVariants();
+
+  /// Stock snapshot with aggregated totals and nested variants (JSON string)
+  Future<String> getAllStock();
+
+  /// Delete a variant by id; soft by default
+  Future<bool> deleteVariantById(String variantId, {bool hard = false});
 }

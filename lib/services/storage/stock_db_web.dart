@@ -1,3 +1,9 @@
+// stock_db_web.dart
+// A cleaned-up, battle-ready version with clear add/get/edit stock flows.
+// - Fixes the "ad"/"add" typo & normalization
+// - Keeps movement history consistent and idempotent
+// - Adds addStock(), subtractStock(), editStock(), and getStockJson() helpers
+
 import 'dart:convert';
 
 import 'package:sembast_web/sembast_web.dart';
@@ -7,46 +13,152 @@ import 'stock_db.dart';
 
 class StockDbWeb implements StockDb {
   late final Database _db;
+
+  // Stores
   final _products = stringMapStoreFactory.store('products');
   final _variants = stringMapStoreFactory.store('product_variants');
   final _movements = stringMapStoreFactory.store('inventory_movements');
 
+  // -------------------------
+  // Lifecycle
+  // -------------------------
   @override
   Future<void> init() async {
     final factory = databaseFactoryWeb;
     _db = await factory.openDatabase('shoe_pos_web.db');
   }
 
+  // -------------------------
+  // Movements (core primitive)
+  // -------------------------
+  /// Core primitive to apply a stock movement to a variant.
+  /// - Idempotent by `movementId` (re-using the same id won't double-apply).
+  /// - `action` must be 'add' or 'subtract'.
   Future<String> addInventoryMovement({
     required String movementId,
-    required String sku,
+    required String productVariantId, // 🔁 use variant id, not SKU
     required int quantity,
-    required String action,
+    required String action, // 'add' or 'subtract'
     required String dateTime,
     bool isSynced = false,
   }) async {
-    final existing = await _movements.findFirst(
-      _db,
-      finder: Finder(filter: Filter.equals('movement_id', movementId)),
-    );
+    // Normalize and validate action keyword
+    final normalizedAction = action.toLowerCase().trim();
+    final isAdd = normalizedAction == 'add';
+    final isSubtract = normalizedAction == 'subtract';
 
-    if (existing != null) {
-      return existing.key.toString();
+    if (!isAdd && !isSubtract) {
+      throw ArgumentError.value(
+        action,
+        'action',
+        'Must be "add" or "subtract"',
+      );
+    }
+    if (quantity <= 0) {
+      throw ArgumentError.value(quantity, 'quantity', 'Must be > 0');
     }
 
-    final key = movementId; // Use movementId as record key (UUID)
-    await _movements.record(key).put(_db, {
-      'movement_id': movementId,
-      'sku': sku,
-      'quantity': quantity,
-      'action': action,
-      'date_time': dateTime,
-      'is_synced': isSynced ? 1 : 0,
-    });
+    return _db.transaction((txn) async {
+      // 1) Idempotency: if movement already exists, don’t apply delta again
+      final existingMovement = await _movements.findFirst(
+        txn,
+        finder: Finder(filter: Filter.equals('movement_id', movementId)),
+      );
+      if (existingMovement != null) {
+        // Movement already recorded; return its key for safety.
+        return existingMovement.key.toString();
+      }
 
-    return key;
+      // 2) Find variant by product_variant_id
+      final variantRec = await _variants.findFirst(
+        txn,
+        finder: Finder(
+          filter: Filter.equals('product_variant_id', productVariantId),
+        ),
+      );
+      if (variantRec == null) {
+        throw StateError('Variant not found: $productVariantId');
+      }
+
+      final variantData = Map<String, dynamic>.from(variantRec.value as Map);
+      final currentQty = (variantData['quantity'] as int?) ?? 0;
+
+      // 3) Compute delta from action
+      final delta = isAdd ? quantity : -quantity;
+
+      // 4) Apply delta (block negatives)
+      final newQty = currentQty + delta;
+      if (newQty < 0) {
+        throw StateError(
+          'Insufficient stock for variant $productVariantId: current=$currentQty, subtract=$quantity',
+        );
+      }
+
+      // 5) Update variant
+      final now = DateTime.now().toIso8601String();
+      await _variants.record(variantRec.key).update(txn, {
+        'quantity': newQty,
+        'updated_at': now,
+        'is_synced': 0,
+      });
+
+      // 6) Record the movement
+      await _movements.record(movementId).put(txn, {
+        'movement_id': movementId,
+        'product_variant_id': productVariantId, // store variant id
+        'quantity': quantity,
+        'action': isAdd ? 'add' : 'subtract', // store normalized keyword
+        'date_time': dateTime,
+        'is_synced': isSynced ? 1 : 0,
+      });
+
+      // 7) Keep product active state in sync
+      final productId = variantData['product_id'] as String?;
+      if (productId != null) {
+        await _recomputeProductActive(txn, productId);
+      }
+
+      return movementId;
+    });
   }
 
+  /// Convenience: strictly increase quantity (movement = add)
+  Future<String> addStock({
+    required String movementId,
+    required String productVariantId,
+    required int quantity, // > 0
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) async {
+    return addInventoryMovement(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: quantity,
+      action: 'add',
+      dateTime: dateTimeIso ?? DateTime.now().toIso8601String(),
+      isSynced: isSynced,
+    );
+  }
+
+  /// Convenience: strictly decrease quantity (movement = subtract)
+  Future<String> subtractStock({
+    required String movementId,
+    required String productVariantId,
+    required int quantity, // > 0
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) async {
+    return addInventoryMovement(
+      movementId: movementId,
+      productVariantId: productVariantId,
+      quantity: quantity,
+      action: 'subtract',
+      dateTime: dateTimeIso ?? DateTime.now().toIso8601String(),
+      isSynced: isSynced,
+    );
+  }
+
+  /// Get movements not yet synced upstream
   Future<List<Map<String, dynamic>>> getUnsyncedMovements() async {
     final records = await _movements.find(
       _db,
@@ -55,6 +167,7 @@ class StockDbWeb implements StockDb {
     return records.map((r) => {'id': r.key, ...r.value}).toList();
   }
 
+  /// Mark a movement synced via its movement_id
   Future<void> markMovementSynced(String movementId) async {
     final record = await _movements.findFirst(
       _db,
@@ -65,6 +178,9 @@ class StockDbWeb implements StockDb {
     }
   }
 
+  // -------------------------
+  // Products
+  // -------------------------
   @override
   Future<String> upsertProduct({
     required String brand,
@@ -98,9 +214,13 @@ class StockDbWeb implements StockDb {
     return productId;
   }
 
+  // -------------------------
+  // Variants (create/update)
+  // -------------------------
   @override
   Future<String> upsertVariant({
     required String productId,
+    String? variantID,
     required int sizeEu,
     required String colorName,
     String? colorHex,
@@ -116,7 +236,7 @@ class StockDbWeb implements StockDb {
     return await _db.transaction((txn) async {
       final existing = await _variants.findFirst(
         txn,
-        finder: Finder(filter: Filter.equals('sku', sku)),
+        finder: Finder(filter: Filter.equals('product_variant_id', variantID)),
       );
 
       if (existing != null) {
@@ -128,6 +248,7 @@ class StockDbWeb implements StockDb {
           'size_eu': sizeEu,
           'color_name': colorName,
           'color_hex': colorHex,
+          'sku': sku,
           'quantity': isEdit == true ? quantity : currentQty + quantity,
           'purchase_price': purchasePrice,
           'sale_price': salePrice,
@@ -162,6 +283,107 @@ class StockDbWeb implements StockDb {
     });
   }
 
+  // -------------------------
+  // Edit Variant + Quantity (with movement logging)
+  // -------------------------
+  /// Edit metadata (size/color/sku/prices) and/or set quantity to an exact value.
+  /// If quantity changes, a movement is recorded with the delta.
+  Future<void> editStock({
+    required String productVariantId,
+    String? productId, // if you allow moving variants across products
+    int? sizeEu,
+    String? colorName,
+    String? colorHex,
+    String? sku,
+    double? purchasePrice,
+    double? salePrice,
+    int? newQuantity, // if null -> quantity unchanged
+    String? movementId, // provide for idempotency when quantity changes
+    String? dateTimeIso,
+    bool isSynced = false,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final movementTime = dateTimeIso ?? now;
+
+    await _db.transaction((txn) async {
+      // 1) Load existing variant
+      final existing = await _variants.findFirst(
+        txn,
+        finder: Finder(
+          filter: Filter.equals('product_variant_id', productVariantId),
+        ),
+      );
+      if (existing == null) {
+        throw StateError('Variant not found: $productVariantId');
+      }
+      final data = Map<String, dynamic>.from(existing.value);
+      final currentQty = (data['quantity'] as int?) ?? 0;
+
+      // 2) Compute delta if newQuantity provided
+      int? delta;
+      if (newQuantity != null) {
+        if (newQuantity < 0) {
+          throw ArgumentError.value(newQuantity, 'newQuantity', 'Must be >= 0');
+        }
+        delta = newQuantity - currentQty;
+        if (currentQty + delta < 0) {
+          throw StateError('Resulting quantity would be negative');
+        }
+      }
+
+      // 3) Prepare update map (only changed fields)
+      final updateMap = <String, Object?>{
+        if (productId != null) 'product_id': productId,
+        if (sizeEu != null) 'size_eu': sizeEu,
+        if (colorName != null) 'color_name': colorName,
+        if (colorHex != null) 'color_hex': colorHex,
+        if (sku != null) 'sku': sku,
+        if (purchasePrice != null) 'purchase_price': purchasePrice,
+        if (salePrice != null) 'sale_price': salePrice,
+        if (newQuantity != null) 'quantity': newQuantity,
+        'updated_at': now,
+        'is_synced': 0,
+        'is_active': 1,
+      };
+
+      // 4) Update variant
+      await _variants.record(existing.key).update(txn, updateMap);
+
+      // 5) If quantity changed, write a movement with the delta
+      if (delta != null && delta != 0) {
+        final id = movementId ?? const Uuid().v4();
+        final action = delta > 0 ? 'add' : 'subtract';
+        final magnitude = delta.abs();
+
+        // idempotency check (in case UI retries)
+        final prior = await _movements.findFirst(
+          txn,
+          finder: Finder(filter: Filter.equals('movement_id', id)),
+        );
+        if (prior == null) {
+          await _movements.record(id).put(txn, {
+            'movement_id': id,
+            'product_variant_id': productVariantId,
+            'quantity': magnitude,
+            'action': action,
+            'date_time': movementTime,
+            'is_synced': isSynced ? 1 : 0,
+          });
+        }
+      }
+
+      // 6) Keep product's active state in sync
+      final pidForRecompute = (updateMap['product_id'] ?? data['product_id'])
+          ?.toString();
+      if (pidForRecompute != null) {
+        await _recomputeProductActive(txn, pidForRecompute);
+      }
+    });
+  }
+
+  // -------------------------
+  // Queries / Reporting
+  // -------------------------
   @override
   Future<List<Map<String, dynamic>>> getAllProducts() async {
     final records = await _products.find(_db);
@@ -173,6 +395,9 @@ class StockDbWeb implements StockDb {
     final records = await _variants.find(_db);
     return records.map((r) => {'id': r.key, ...r.value}).toList();
   }
+
+  /// Alias for your existing stock snapshot
+  Future<String> getStockJson() => getAllStock();
 
   @override
   Future<String> getAllStock() async {
@@ -245,6 +470,9 @@ class StockDbWeb implements StockDb {
     return jsonEncode(result);
   }
 
+  // -------------------------
+  // Deletes
+  // -------------------------
   @override
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
     return await _db.transaction((txn) async {
@@ -271,6 +499,9 @@ class StockDbWeb implements StockDb {
     });
   }
 
+  // -------------------------
+  // Internal helpers
+  // -------------------------
   Future<void> _recomputeProductActive(
     DatabaseClient txn,
     String productIdStr,

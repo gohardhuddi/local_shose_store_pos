@@ -61,3 +61,34 @@ class SearchQueryChanged extends AddStockEvents {
   final String query;
   SearchQueryChanged(this.query);
 }
+
+class EditStockVariant extends AddStockEvents {
+  final String size;
+  final String color;
+  final String productCodeSku;
+  final String quantity;
+  final String purchasePrice;
+  final String suggestedSalePrice;
+  final String productID;
+  final String variantID;
+
+  EditStockVariant({
+    required this.color,
+    required this.productCodeSku,
+    required this.purchasePrice,
+    required this.quantity,
+    required this.size,
+    required this.suggestedSalePrice,
+    required this.productID,
+    required this.variantID,
+  });
+
+  @override
+  List<Object> get props => [
+    color,
+    productCodeSku,
+    purchasePrice,
+    suggestedSalePrice,
+    size,
+  ];
+}
