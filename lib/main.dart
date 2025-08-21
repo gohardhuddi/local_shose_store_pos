@@ -4,9 +4,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_bloc.dart';
 import 'package:local_shoes_store_pos/repository/add_stock_repository.dart';
 import 'package:local_shoes_store_pos/services/add_stock_service_local.dart';
+import 'package:local_shoes_store_pos/services/add_stock_service_remote.dart';
+import 'package:local_shoes_store_pos/services/networking/network_service.dart';
 import 'package:local_shoes_store_pos/views/theme_bloc/theme_bloc.dart';
 import 'package:local_shoes_store_pos/views/view_helpers/theme.dart';
 
+import 'helper/global.dart';
 import 'helper/routes.dart';
 import 'services/storage/stock_db.dart';
 import 'services/storage/stock_db_factory.dart';
@@ -15,7 +18,7 @@ late final StockDb stockDb;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  WidgetsFlutterBinding.ensureInitialized();
+  Global.setup();
   stockDb = StockDbFactory.create();
   await stockDb.init();
 
@@ -33,7 +36,10 @@ class MyApp extends StatelessWidget {
     );
 
     return RepositoryProvider(
-      create: (context) => AddStockRepository(StockServiceLocal()),
+      create: (context) => AddStockRepository(
+        StockServiceLocal(),
+        AddStockServiceRemote(networkService: NetworkService()),
+      ),
       child: MultiBlocProvider(
         providers: [
           BlocProvider<ThemeBloc>(create: (context) => ThemeBloc()),

@@ -50,6 +50,13 @@ class GetStockFromDB extends AddStockEvents {
   List<Object> get props => [];
 }
 
+class GetUnSyncedStockFromDB extends AddStockEvents {
+  GetUnSyncedStockFromDB();
+
+  @override
+  List<Object> get props => [];
+}
+
 class DeleteVariantByIdEvent extends AddStockEvents {
   final String variantID;
   DeleteVariantByIdEvent({required this.variantID});

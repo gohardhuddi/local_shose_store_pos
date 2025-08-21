@@ -18,6 +18,7 @@ class StockServiceLocal {
   }
 
   String _normStr(String? s) => (s ?? '').trim();
+
   String _normUpper(String s) => s.trim().toUpperCase();
 
   // ---------------------------
@@ -167,6 +168,12 @@ class StockServiceLocal {
   // ---------------------------
 
   Future<dynamic> getAllStock() => stockDb.getAllStock();
+
+  Future<dynamic> getUnSyncPayload() {
+    var unsynced = stockDb.getUnsyncedPayload();
+    print(unsynced);
+    return unsynced;
+  }
 
   Future<List<Map<String, dynamic>>> getAllProducts() =>
       stockDb.getAllProducts();

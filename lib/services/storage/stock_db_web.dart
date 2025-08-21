@@ -198,6 +198,7 @@ class StockDbWeb implements StockDb {
         'article_name': articleName,
         'updated_at': now,
         'is_active': 1,
+        'is_synced': 0,
       });
       return existing.key.toString();
     }
@@ -210,6 +211,7 @@ class StockDbWeb implements StockDb {
       'is_active': 1,
       'created_at': now,
       'updated_at': now,
+      'is_synced': 0,
     });
     return productId;
   }
@@ -523,5 +525,60 @@ class StockDbWeb implements StockDb {
     } else {
       await rec.update(txn, {'is_active': 0, 'updated_at': now});
     }
+  }
+
+  /// Variants where is_synced == 0 (optionally only active)
+  Future<List<Map<String, dynamic>>> getUnsyncedVariants({
+    bool onlyActive = true,
+  }) async {
+    final filter = onlyActive
+        ? Filter.and([
+            Filter.equals('is_synced', 0),
+            Filter.equals('is_active', 1),
+          ])
+        : Filter.equals('is_synced', 0);
+
+    final records = await _variants.find(_db, finder: Finder(filter: filter));
+    return records.map((r) => {'id': r.key, ...r.value}).toList();
+  }
+
+  /// Products where is_synced == 0 (optionally only active)
+  Future<List<Map<String, dynamic>>> getUnsyncedProducts({
+    bool onlyActive = true,
+  }) async {
+    final filter = onlyActive
+        ? Filter.and([
+            Filter.equals('is_synced', 0),
+            Filter.equals('is_active', 1),
+          ])
+        : Filter.equals('is_synced', 0);
+
+    final records = await _products.find(_db, finder: Finder(filter: filter));
+    return records.map((r) => {'id': r.key, ...r.value}).toList();
+  }
+
+  /// Mark a product synced by its productId (record key)
+  Future<void> markProductSynced(String productId) async {
+    await _products.record(productId).update(_db, {'is_synced': 1});
+  }
+
+  /// Mark a variant synced by its productVariantId (we search by field for safety)
+  Future<void> markVariantSynced(String productVariantId) async {
+    final record = await _variants.findFirst(
+      _db,
+      finder: Finder(
+        filter: Filter.equals('product_variant_id', productVariantId),
+      ),
+    );
+    if (record != null) {
+      await _variants.record(record.key).update(_db, {'is_synced': 1});
+    }
+  }
+
+  Future<Map<String, dynamic>> getUnsyncedPayload() async {
+    final products = await getUnsyncedProducts(onlyActive: false);
+    final variants = await getUnsyncedVariants(onlyActive: false);
+    final movements = await getUnsyncedMovements();
+    return {'products': products, 'variants': variants, 'movements': movements};
   }
 }

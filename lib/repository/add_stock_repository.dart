@@ -1,8 +1,10 @@
 import 'package:local_shoes_store_pos/services/add_stock_service_local.dart';
+import 'package:local_shoes_store_pos/services/add_stock_service_remote.dart';
 
 class AddStockRepository {
   final StockServiceLocal _stockServiceLocal;
-  AddStockRepository(this._stockServiceLocal);
+  final AddStockServiceRemote _stockServiceRemote;
+  AddStockRepository(this._stockServiceLocal, this._stockServiceRemote);
 
   // ---------------------------
   // Create / Upsert
@@ -128,6 +130,8 @@ class AddStockRepository {
   // ---------------------------
 
   Future<dynamic> getAllStockRepo() => _stockServiceLocal.getAllStock();
+  Future<dynamic> getUnSyncPayloadRepo() =>
+      _stockServiceLocal.getUnSyncPayload();
 
   Future<List<Map<String, dynamic>>> getAllProductsRepo() =>
       _stockServiceLocal.getAllProducts();
@@ -144,5 +148,9 @@ class AddStockRepository {
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) {
     // Forward the 'hard' flag (previously ignored).
     return _stockServiceLocal.deleteVariantById(variantId, hard: hard);
+  }
+
+  Future<dynamic> syncProductsToBackend(dynamic mapedList) {
+    return _stockServiceRemote.uploadCatalogList(mapedList);
   }
 }

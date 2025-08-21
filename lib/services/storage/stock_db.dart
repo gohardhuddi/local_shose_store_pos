@@ -85,6 +85,9 @@ abstract class StockDb {
   Future<List<Map<String, dynamic>>> getUnsyncedMovements();
   Future<void> markMovementSynced(String movementId);
 
+  //get unsynced pro and vari
+
+  Future<Map<String, dynamic>> getUnsyncedPayload();
   // -------------------------
   // Queries / Reporting
   // -------------------------

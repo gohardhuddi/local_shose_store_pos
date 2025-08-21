@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stream_transform/stream_transform.dart';
 import 'package:uuid/uuid.dart';
@@ -18,6 +20,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
     on<AddStockToDB>(_onAddStockToDB);
     on<EditStockVariant>(_onEditVariant);
     on<GetStockFromDB>(_onGetAllStock);
+    on<GetUnSyncedStockFromDB>(_onGetAllUnsyncedStock);
     on<DeleteVariantByIdEvent>(_onDeleteVariantById);
     on<SearchQueryChanged>(
       _onSearchChanged,
@@ -90,6 +93,20 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
     emit(GetStockFromDBSuccessState(stockList: _all, query: ''));
   }
 
+  Future<void> _onGetAllUnsyncedStock(
+    GetUnSyncedStockFromDB e,
+    Emitter<AddStockStates> emit,
+  ) async {
+    emit(AddStockLoadingState());
+    final unSynced = await _addStockRepo.getUnSyncPayloadRepo();
+    print(jsonEncode(unSynced));
+    var mapedList = mapUnsyncedToBackend(unSynced);
+    var result = _addStockRepo.syncProductsToBackend(mapedList);
+    //now we will need to update products and variants from sync=0 to sync =1
+    //but we need to update DTO response to add variant ids
+    print(result);
+  }
+
   Future<void> _onDeleteVariantById(
     DeleteVariantByIdEvent event,
     Emitter<AddStockStates> emit,
@@ -152,5 +169,74 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
     }
     final hay = buf.toString();
     return terms.every(hay.contains);
+  }
+
+  /// data maping
+  // mapper_unsynced_to_backend.dart
+
+  /// Normalizes the unsynced payload (products + variants) into your backend shape.
+  /// Input example matches what you printed from the app.
+  List<Map<String, dynamic>> mapUnsyncedToBackend(
+    Map<String, dynamic> unsynced,
+  ) {
+    final products = (unsynced['products'] as List? ?? const [])
+        .cast<Map>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
+    final variants = (unsynced['variants'] as List? ?? const [])
+        .cast<Map>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
+    // Group variants by product_id
+    final Map<String, List<Map<String, dynamic>>> variantsByProductId = {};
+    for (final v in variants) {
+      final pid = (v['product_id'] ?? v['productId'] ?? '').toString();
+      (variantsByProductId[pid] ??= <Map<String, dynamic>>[]).add(v);
+    }
+
+    // Map each product + its variants to backend shape
+    final List<Map<String, dynamic>> out = [];
+    for (final p in products) {
+      final pid = (p['id'] ?? p['product_id'] ?? p['productId'] ?? '')
+          .toString();
+      final vlist = variantsByProductId[pid] ?? const <Map<String, dynamic>>[];
+
+      final mappedVariants = vlist.map((v) {
+        return {
+          'productVariantId':
+              (v['product_variant_id'] ?? v['productVariantId'] ?? v['id'])
+                  .toString(),
+          'productId': pid,
+          'sizeEu': v['size_eu'],
+          'colorName': v['color_name'],
+          'colorHex': v['color_hex'],
+          'sku': v['sku'],
+          'quantity': v['quantity'],
+          'purchasePrice': (v['purchase_price'] as num?)?.toDouble() ?? 0.0,
+          'salePrice': (v['sale_price'] as num?)?.toDouble(),
+        };
+      }).toList();
+
+      out.add({
+        'productId': pid,
+        'brand': (p['brand'] ?? '').toString(),
+        'articleCode': (p['article_code'] ?? p['articleCode'] ?? '').toString(),
+        'articleName': (p['article_name'] ?? p['articleName'] ?? '').toString(),
+        'notes': (p['notes'] ?? '').toString(),
+        'isActive': _toBool(p['is_active'] ?? p['isActive'] ?? 1),
+        'variants': mappedVariants,
+      });
+    }
+
+    return out;
+  }
+
+  bool _toBool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) return v == '1' || v.toLowerCase() == 'true';
+    return false;
   }
 }

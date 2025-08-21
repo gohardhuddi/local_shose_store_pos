@@ -26,6 +26,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
 
   void _load() {
     context.read<AddStockBloc>().add(GetStockFromDB());
+    context.read<AddStockBloc>().add(GetUnSyncedStockFromDB());
   }
 
   @override
