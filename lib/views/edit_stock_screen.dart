@@ -24,14 +24,14 @@ TextEditingController customColorController = TextEditingController();
 
 class _EditStockScreenState extends State<EditStockScreen> {
   final List<String> colors = [
-    'Black',
-    'Brown',
-    'White',
-    'Red',
-    'Blue',
-    'Other',
+    CustomStrings.black,
+    CustomStrings.brown,
+    CustomStrings.white,
+    CustomStrings.red,
+    CustomStrings.blue,
+    CustomStrings.other,
   ];
-  final List<String> actions = ['Add', 'Subtract'];
+  final List<String> actions = [CustomStrings.add, CustomStrings.subtract];
 
   TextEditingController suggestedSalePriceController = TextEditingController();
   TextEditingController purchasePriceController = TextEditingController();
@@ -105,7 +105,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
                       ],
                     ),
                     Text(
-                      "Update Variant",
+                      CustomStrings.updateVariant,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     Row(
@@ -119,7 +119,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
                           ),
                         ),
                         Text(
-                          "Variant",
+                          CustomStrings.variant,
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
                         Expanded(
@@ -134,13 +134,13 @@ class _EditStockScreenState extends State<EditStockScreen> {
                     ),
                     CustomTextField(
                       textEditingController: sizeController,
-                      labelText: "Size *",
-                      hintText: "e.g 48",
+                      labelText: CustomStrings.size,
+                      hintText: CustomStrings.sizeHint,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (value) => requiredFieldValidator(
                         value: value,
-                        fieldName: "Size",
+                        fieldName: CustomStrings.size,
                       ),
                       onChanged: (v) {
                         updateSku();
@@ -152,7 +152,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       value: selectedColor,
                       decoration: InputDecoration(
-                        labelText: 'Color',
+                        labelText: CustomStrings.color,
                         border: OutlineInputBorder(),
                       ),
                       items: colors.map((color) {
@@ -168,27 +168,27 @@ class _EditStockScreenState extends State<EditStockScreen> {
                       },
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Color is required';
+                          return CustomStrings.colorRequired;
                         }
                         return null;
                       },
                     ),
 
-                    selectedColor == 'Other'
+                    selectedColor == CustomStrings.other
                         ? CustomTextField(
                             textEditingController: customColorController,
-                            labelText: "Color *",
-                            hintText: "e.g Black",
+                            labelText: CustomStrings.color,
+                            hintText: CustomStrings.colorHint,
                             onChanged: (v) => updateSku(),
                           )
                         : SizedBox.shrink(),
                     CustomTextField(
                       textEditingController: productCodeSKUController,
-                      labelText: "Product Code SKU *",
-                      hintText: "e.g ADSH001-BLK-42",
+                      labelText: CustomStrings.productCodeSku,
+                      hintText: CustomStrings.productCodeSkuHint,
                       validator: (value) => requiredFieldValidator(
                         value: value,
-                        fieldName: "Product Code SKU",
+                        fieldName: CustomStrings.productCodeSku,
                       ),
                     ),
                     Row(
@@ -198,20 +198,20 @@ class _EditStockScreenState extends State<EditStockScreen> {
                           width: MediaQuery.of(context).size.width * 0.44,
                           child: CustomTextField(
                             textEditingController: quantityController,
-                            labelText: "Quantity *",
-                            hintText: "e.g 10",
+                            labelText: CustomStrings.quantity,
+                            hintText: CustomStrings.quantityHint,
                             keyboardType: TextInputType.number,
                             validator: (value) {
                               var decision = requiredFieldValidator(
                                 value: value,
-                                fieldName: "Quantity",
+                                fieldName: CustomStrings.quantity,
                               );
                               if (decision == null) {
                                 if (int.tryParse(value ?? "0")! > 0) {
                                   return decision = null;
                                 } else {
                                   return decision =
-                                      "Quantity should be greater then 0";
+                                      CustomStrings.quantityGreaterThanZero;
                                 }
                               }
                               return decision;
@@ -225,7 +225,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
                                 AutovalidateMode.onUserInteraction,
                             value: selectedAction,
                             decoration: InputDecoration(
-                              labelText: 'Action',
+                              labelText: CustomStrings.action,
                               border: OutlineInputBorder(),
                             ),
                             items: actions.map((action) {
@@ -239,7 +239,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
                             },
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Color is required';
+                                return CustomStrings.actionRequired;
                               }
                               return null;
                             },
@@ -249,19 +249,19 @@ class _EditStockScreenState extends State<EditStockScreen> {
                     ),
                     CustomTextField(
                       textEditingController: purchasePriceController,
-                      labelText: "Purchase Price *",
-                      hintText: "e.g 700",
+                      labelText: CustomStrings.purchasePrice,
+                      hintText: CustomStrings.purchasePriceHint,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         var decision = requiredFieldValidator(
                           value: value,
-                          fieldName: "Purchase Price",
+                          fieldName: CustomStrings.purchasePrice,
                         );
                         if (decision == null) {
                           if (int.tryParse(value ?? "0")! > 0) {
                             return decision = null;
                           } else {
-                            return decision = "Price should be greater then 0";
+                            return decision = CustomStrings.priceGreaterThanZero;
                           }
                         }
                         return decision;
@@ -269,13 +269,13 @@ class _EditStockScreenState extends State<EditStockScreen> {
                     ),
                     CustomTextField(
                       textEditingController: suggestedSalePriceController,
-                      labelText: "Suggested Sale Price *",
-                      hintText: "e.g 1000",
+                      labelText: CustomStrings.suggestedSalePrice,
+                      hintText: CustomStrings.suggestedSalePriceHint,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         var decision = requiredFieldValidator(
                           value: value,
-                          fieldName: "Sale Price",
+                          fieldName: CustomStrings.suggestedSalePrice,
                         );
                         if (decision == null) {
                           if (int.tryParse(value ?? "0")! >=
@@ -283,7 +283,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
                             return decision = null;
                           } else {
                             return decision =
-                                "Sale Price should be equal or greater then Purchase Price";
+                                CustomStrings.salePriceGreaterThanPurchase;
                           }
                         }
                         return decision;
@@ -314,7 +314,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
                           );
                         }
                       },
-                      buttonTitle: "Update Stock",
+                      buttonTitle: CustomStrings.updateStock,
                     ),
                   ],
                 ),
@@ -328,7 +328,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
 
   String? requiredFieldValidator({String? value, required String fieldName}) {
     if (value == null || value.trim().isEmpty) {
-      return '$fieldName is required';
+      return '$fieldName ${CustomStrings.fieldRequired}';
     }
     return null;
   }
@@ -353,7 +353,7 @@ class _EditStockScreenState extends State<EditStockScreen> {
   }
 
   void _prefillColorFromVariant(String? colorName) {
-    final other = 'Other';
+    final other = CustomStrings.other;
     final c = (colorName ?? '').trim();
 
     // case-insensitive match against your list

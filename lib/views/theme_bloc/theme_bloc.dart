@@ -25,6 +25,6 @@ class ThemeBloc extends Bloc<ThemeEvent, ThemeMode> {
   static ThemeMode _getInitialTheme() {
     var brightness =
         SchedulerBinding.instance.platformDispatcher.platformBrightness;
-    return brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.dark;
+    return brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light;
   }
 }

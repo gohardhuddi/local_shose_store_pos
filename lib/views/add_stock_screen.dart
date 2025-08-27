@@ -23,12 +23,12 @@ TextEditingController customColorController = TextEditingController();
 
 class _AddStockScreenState extends State<AddStockScreen> {
   final List<String> colors = [
-    'Black',
-    'Brown',
-    'White',
-    'Red',
-    'Blue',
-    'Other',
+    CustomStrings.black,
+    CustomStrings.brown,
+    CustomStrings.white,
+    CustomStrings.red,
+    CustomStrings.blue,
+    CustomStrings.other,
   ];
   TextEditingController brandController = TextEditingController();
   TextEditingController articleCodeController = TextEditingController();
@@ -111,7 +111,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       ],
                     ),
                     Text(
-                      "Add Stock",
+                      CustomStrings.addStock,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     Row(
@@ -125,7 +125,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
                           ),
                         ),
                         Text(
-                          "Product",
+                          CustomStrings.product,
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
                         Expanded(
@@ -140,26 +140,26 @@ class _AddStockScreenState extends State<AddStockScreen> {
                     ),
                     CustomTextField(
                       textEditingController: brandController,
-                      labelText: "Brand *",
-                      hintText: "e.g Bata Shoes",
+                      labelText: CustomStrings.brand,
+                      hintText: CustomStrings.brandHint,
                       validator: (value) => requiredFieldValidator(
                         value: value,
-                        fieldName: "Brand",
+                        fieldName: CustomStrings.brand,
                       ),
                     ),
                     CustomTextField(
                       textEditingController: articleCodeController,
-                      labelText: "Article Code *",
-                      hintText: "e.g ADSH001",
+                      labelText: CustomStrings.articleCode,
+                      hintText: CustomStrings.articleCodeHint,
                       validator: (value) => requiredFieldValidator(
                         value: value,
-                        fieldName: "Article Code",
+                        fieldName: CustomStrings.articleCode,
                       ),
                     ),
                     CustomTextField(
                       textEditingController: articleNameController,
-                      labelText: "Article Name",
-                      hintText: "e.g Adidas Runner",
+                      labelText: CustomStrings.articleName,
+                      hintText: CustomStrings.articleNameHint,
                     ),
                     Row(
                       children: [
@@ -172,7 +172,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
                           ),
                         ),
                         Text(
-                          "Variant",
+                          CustomStrings.variant,
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
                         Expanded(
@@ -187,13 +187,13 @@ class _AddStockScreenState extends State<AddStockScreen> {
                     ),
                     CustomTextField(
                       textEditingController: sizeController,
-                      labelText: "Size *",
-                      hintText: "e.g 48",
+                      labelText: CustomStrings.size,
+                      hintText: CustomStrings.sizeHint,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (value) => requiredFieldValidator(
                         value: value,
-                        fieldName: "Size",
+                        fieldName: CustomStrings.size,
                       ),
                     ),
 
@@ -201,7 +201,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       value: selectedColor,
                       decoration: InputDecoration(
-                        labelText: 'Color',
+                        labelText: CustomStrings.color,
                         border: OutlineInputBorder(),
                       ),
                       items: colors.map((color) {
@@ -217,45 +217,45 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       },
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Color is required';
+                          return CustomStrings.colorRequired;
                         }
                         return null;
                       },
                     ),
 
-                    selectedColor == 'Other'
+                    selectedColor == CustomStrings.other
                         ? CustomTextField(
                             textEditingController: customColorController,
-                            labelText: "Color *",
-                            hintText: "e.g Black",
+                            labelText: CustomStrings.color,
+                            hintText: CustomStrings.colorHint,
                             onChanged: (v) => updateSku(),
                           )
                         : SizedBox.shrink(),
                     CustomTextField(
                       textEditingController: productCodeSKUController,
-                      labelText: "Product Code SKU *",
-                      hintText: "e.g ADSH001-BLK-42",
+                      labelText: CustomStrings.productCodeSku,
+                      hintText: CustomStrings.productCodeSkuHint,
                       validator: (value) => requiredFieldValidator(
                         value: value,
-                        fieldName: "Product Code SKU",
+                        fieldName: CustomStrings.productCodeSku,
                       ),
                     ),
                     CustomTextField(
                       textEditingController: quantityController,
-                      labelText: "Quantity *",
-                      hintText: "e.g 10",
+                      labelText: CustomStrings.quantity,
+                      hintText: CustomStrings.quantityHint,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         var decision = requiredFieldValidator(
                           value: value,
-                          fieldName: "Quantity",
+                          fieldName: CustomStrings.quantity,
                         );
                         if (decision == null) {
                           if (int.tryParse(value ?? "0")! > 0) {
                             return decision = null;
                           } else {
                             return decision =
-                                "Quantity should be greater then 0";
+                                CustomStrings.quantityGreaterThanZero;
                           }
                         }
                         return decision;
@@ -263,19 +263,19 @@ class _AddStockScreenState extends State<AddStockScreen> {
                     ),
                     CustomTextField(
                       textEditingController: purchasePriceController,
-                      labelText: "Purchase Price *",
-                      hintText: "e.g 700",
+                      labelText: CustomStrings.purchasePrice,
+                      hintText: CustomStrings.purchasePriceHint,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         var decision = requiredFieldValidator(
                           value: value,
-                          fieldName: "Purchase Price",
+                          fieldName: CustomStrings.purchasePrice,
                         );
                         if (decision == null) {
                           if (int.tryParse(value ?? "0")! > 0) {
                             return decision = null;
                           } else {
-                            return decision = "Price should be greater then 0";
+                            return decision = CustomStrings.priceGreaterThanZero;
                           }
                         }
                         return decision;
@@ -283,13 +283,13 @@ class _AddStockScreenState extends State<AddStockScreen> {
                     ),
                     CustomTextField(
                       textEditingController: suggestedSalePriceController,
-                      labelText: "Suggested Sale Price *",
-                      hintText: "e.g 1000",
+                      labelText: CustomStrings.suggestedSalePrice,
+                      hintText: CustomStrings.suggestedSalePriceHint,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         var decision = requiredFieldValidator(
                           value: value,
-                          fieldName: "Sale Price",
+                          fieldName: CustomStrings.suggestedSalePrice,
                         );
                         if (decision == null) {
                           if (int.tryParse(value ?? "0")! >=
@@ -297,7 +297,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
                             return decision = null;
                           } else {
                             return decision =
-                                "Sale Price should be equal or greater then Purchase Price";
+                                CustomStrings.salePriceGreaterThanPurchase;
                           }
                         }
                         return decision;
@@ -330,7 +330,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
                           );
                         }
                       },
-                      buttonTitle: "Add Stock",
+                      buttonTitle: CustomStrings.addStock,
                     ),
                   ],
                 ),
@@ -344,7 +344,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
 
   String? requiredFieldValidator({String? value, required String fieldName}) {
     if (value == null || value.trim().isEmpty) {
-      return '$fieldName is required';
+      return '$fieldName ${CustomStrings.fieldRequired}';
     }
     return null;
   }
@@ -369,7 +369,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
   }
 
   void _prefillColorFromVariant(String? colorName) {
-    final other = 'Other';
+    final other = CustomStrings.other;
     final c = (colorName ?? '').trim();
 
     // case-insensitive match against your list

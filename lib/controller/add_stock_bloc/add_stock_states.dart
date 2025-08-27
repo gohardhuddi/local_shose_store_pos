@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/models/stock_model.dart';
 
 sealed class AddStockStates extends Equatable {
@@ -11,14 +12,14 @@ class AddStockInitialState extends AddStockStates {}
 class AddStockLoadingState extends AddStockStates {}
 
 class AddStockSuccessState extends AddStockStates {
-  final String successMessage = "Stock Added Successfully";
+  final String successMessage = CustomStrings.stockAddedSuccessfully;
 
   @override
   List<Object> get props => [successMessage];
 }
 
 class AddStockErrorState extends AddStockStates {
-  final String error = "Something went wrong! Try Again";
+  final String error = CustomStrings.somethingWentWrong;
 
   @override
   List<Object> get props => [error];
@@ -34,7 +35,7 @@ class GetStockFromDBSuccessState extends AddStockStates {
 }
 
 class DeleteVariantByIdSuccessState extends AddStockStates {
-  final String success = "Variant Deleted Successfully";
+  final String success = CustomStrings.variantDeletedSuccessfully;
 
   @override
   List<Object> get props => [success];

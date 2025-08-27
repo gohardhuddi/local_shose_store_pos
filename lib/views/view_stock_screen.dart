@@ -7,6 +7,7 @@ import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/models/stock_model.dart';
 import 'package:local_shoes_store_pos/views/add_stock_screen.dart';
 import 'package:local_shoes_store_pos/views/edit_stock_screen.dart';
+import 'package:local_shoes_store_pos/views/view_helpers/search_helper.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
 class ViewStockScreen extends StatefulWidget {
@@ -18,6 +19,10 @@ class ViewStockScreen extends StatefulWidget {
 }
 
 class _ViewStockScreenState extends State<ViewStockScreen> {
+  List<StockModel> _allStock = [];
+  List<StockModel> _filteredStock = [];
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +31,14 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
 
   void _load() {
     context.read<AddStockBloc>().add(GetStockFromDB());
-    context.read<AddStockBloc>().add(GetUnSyncedStockFromDB());
+    // context.read<AddStockBloc>().add(GetUnSyncedStockFromDB());
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+      _filteredStock = SearchHelper.filterStock(_allStock, query);
+    });
   }
 
   @override
@@ -34,7 +46,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: const Text('${CustomStrings.shopName} Stock'),
+        title: Text('${CustomStrings.shopName} ${CustomStrings.stockTitle}'),
         centerTitle: true,
       ),
       body: Column(
@@ -42,10 +54,9 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: TextField(
-              onChanged: (q) =>
-                  context.read<AddStockBloc>().add(SearchQueryChanged(q)),
+              onChanged: _onSearchChanged,
               decoration: InputDecoration(
-                hintText: 'Search brand, article, SKU, color, size…',
+                hintText: CustomStrings.searchHint,
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -74,10 +85,23 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                   }
 
                   if (state is GetStockFromDBSuccessState) {
-                    final List<StockModel> items = state.stockList;
-                    if (items.isEmpty) {
-                      return const Center(
-                        child: Text('No stock yet. Add some!'),
+                    _allStock = state.stockList;
+                    if (_searchQuery.isNotEmpty) {
+                      _filteredStock = SearchHelper.filterStock(
+                        _allStock,
+                        _searchQuery,
+                      );
+                    } else {
+                      _filteredStock = _allStock;
+                    }
+
+                    if (_filteredStock.isEmpty) {
+                      return Center(
+                        child: Text(
+                          _searchQuery.isNotEmpty
+                              ? CustomStrings.noStock
+                              : CustomStrings.noStockYet,
+                        ),
                       );
                     }
 
@@ -89,9 +113,9 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                             child: ListView.builder(
                               key: const PageStorageKey('stock_list'),
                               padding: const EdgeInsets.symmetric(vertical: 4),
-                              itemCount: items.length,
+                              itemCount: _filteredStock.length,
                               itemBuilder: (context, index) {
-                                final p = items[index];
+                                final p = _filteredStock[index];
 
                                 return Card(
                                   margin: const EdgeInsets.symmetric(
@@ -116,7 +140,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                       ),
                                     ),
                                     subtitle: Text(
-                                      'Qty ${p.totalQty ?? 0}  |  Variants ${p.variantCount ?? 0}',
+                                      '${CustomStrings.qtyTotal} ${p.totalQty ?? 0}  |  ${CustomStrings.variants} ${p.variantCount ?? 0}',
                                     ),
                                     childrenPadding: const EdgeInsets.fromLTRB(
                                       16,
@@ -135,10 +159,10 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                             ),
                                           ),
                                           title: Text(
-                                            'SKU: ${v.sku}\nSize: ${v.size}\nColor: ${v.colorName}',
+                                            '${CustomStrings.sku} ${v.sku}\n${CustomStrings.sizeLabel} ${v.size}\n${CustomStrings.colorLabel} ${v.colorName}',
                                           ),
                                           subtitle: Text(
-                                            'Qty: ${v.qty}   Buy: ${v.purchasePrice?.toStringAsFixed(0)}   Sell: ${v.salePrice?.toStringAsFixed(0)}',
+                                            '${CustomStrings.qty}: ${v.qty}   ${CustomStrings.buy}: ${v.purchasePrice?.toStringAsFixed(0)}   ${CustomStrings.sell}: ${v.salePrice?.toStringAsFixed(0)}',
                                           ),
                                           trailing: SizedBox(
                                             width: 100,
@@ -146,7 +170,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                               spacing: 3,
                                               children: [
                                                 IconButton(
-                                                  tooltip: "Edit",
+                                                  tooltip: CustomStrings.edit,
                                                   onPressed: () {
                                                     PersistentNavBarNavigator.pushNewScreen(
                                                       context,
@@ -163,17 +187,19 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                                   icon: Icon(Icons.edit),
                                                 ),
                                                 IconButton(
-                                                  tooltip: "Delete",
+                                                  tooltip: CustomStrings.delete,
                                                   onPressed: () {
                                                     showDialog(
                                                       context: context,
                                                       builder: (BuildContext context) {
                                                         return AlertDialog(
                                                           title: Text(
-                                                            "Confirm Delete",
+                                                            CustomStrings
+                                                                .confirmDelete,
                                                           ),
                                                           content: Text(
-                                                            "Are you sure you want to delete this?",
+                                                            CustomStrings
+                                                                .confirmDeleteMessage,
                                                           ),
                                                           actions: [
                                                             TextButton(
@@ -183,7 +209,8 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                                                 ).pop(); // Close the dialog
                                                               },
                                                               child: Text(
-                                                                "Cancel",
+                                                                CustomStrings
+                                                                    .cancel,
                                                               ),
                                                             ),
                                                             TextButton(
@@ -207,7 +234,8 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                                                     Colors.red,
                                                               ),
                                                               child: Text(
-                                                                "Delete",
+                                                                CustomStrings
+                                                                    .delete,
                                                               ),
                                                             ),
                                                           ],
@@ -230,7 +258,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                             ).showSnackBar(
                                               SnackBar(
                                                 content: Text(
-                                                  'Tapped ${v.sku}',
+                                                  '${CustomStrings.tapped} ${v.sku}',
                                                 ),
                                               ),
                                             );
@@ -250,7 +278,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                   }
 
                   // Fallback for any other state (e.g., initial)
-                  return const Center(child: Text("No stock"));
+                  return Center(child: Text(CustomStrings.noStock));
                 },
               ),
             ),
@@ -266,8 +294,12 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
             pageTransitionAnimation: PageTransitionAnimation.cupertino,
           ).then((_) => _load()); // refresh after returning
         },
-        label: const Row(
-          children: [Icon(Icons.add), SizedBox(width: 8), Text('Add Stock')],
+        label: Row(
+          children: [
+            Icon(Icons.add),
+            SizedBox(width: 8),
+            Text(CustomStrings.addStockButton),
+          ],
         ),
       ),
     );

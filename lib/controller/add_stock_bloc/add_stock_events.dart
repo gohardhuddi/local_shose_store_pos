@@ -34,7 +34,7 @@ class AddStockToDB extends AddStockEvents {
   List<Object> get props => [
     brand,
     articleCode,
-    ?articleName,
+    articleName ?? '',
     color,
     productCodeSku,
     purchasePrice,
@@ -64,10 +64,7 @@ class DeleteVariantByIdEvent extends AddStockEvents {
   List<Object> get props => [variantID];
 }
 
-class SearchQueryChanged extends AddStockEvents {
-  final String query;
-  SearchQueryChanged(this.query);
-}
+
 
 class EditStockVariant extends AddStockEvents {
   final String size;

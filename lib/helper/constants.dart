@@ -10,10 +10,99 @@ class CustomImagesPaths {
   static const appIcon = "assets/images/appIcon.png";
   static const cartIcon = "assets/images/cart.png";
   static const video = "assets/images/Splash.mp4";
+  static const cloudServiceIcon = "assets/images/cloud-service.png";
+  static const internetIcon = "assets/images/internet.png";
+  static const connectivityStateIcon = "assets/images/responsive.png";
 }
 
 class CustomStrings {
-  static const shopName = "AnarKali Shoes";
+  static const shopName = "Anarkali Shoes";
+  static const inventoryManagementSystem = "Inventory Management System";
+
+  // Navigation
+  static const sale = "Sale";
+  static const stock = "Stock";
+  static const returnText = "Return";
+  static const more = "More";
+  static const homePage = "Home Page";
+  static const profilePage = "Profile Page";
+
+  // Add Stock Screen
+  static const addStock = "Add Stock";
+  static const product = "Product";
+  static const variant = "Variant";
+  static const brand = "Brand *";
+  static const brandHint = "e.g Bata Shoes";
+  static const articleCode = "Article Code *";
+  static const articleCodeHint = "e.g ADSH001";
+  static const articleName = "Article Name";
+  static const articleNameHint = "e.g Adidas Runner";
+  static const size = "Size *";
+  static const sizeHint = "e.g 48";
+  static const color = "Color";
+  static const colorHint = "e.g Black";
+  static const productCodeSku = "Product Code SKU *";
+  static const productCodeSkuHint = "e.g ADSH001-BLK-42";
+  static const quantity = "Quantity *";
+  static const quantityHint = "e.g 10";
+  static const purchasePrice = "Purchase Price *";
+  static const purchasePriceHint = "e.g 700";
+  static const suggestedSalePrice = "Suggested Sale Price *";
+  static const suggestedSalePriceHint = "e.g 1000";
+
+  // Edit Stock Screen
+  static const updateVariant = "Update Variant";
+  static const updateStock = "Update Stock";
+  static const action = "Action";
+  static const add = "Add";
+  static const subtract = "Subtract";
+
+  // View Stock Screen
+  static const stockTitle = "Stock";
+  static const searchHint = "Search brand, article, SKU, color, size…";
+  static const noStockYet = "No stock yet. Add some!";
+  static const noStock = "No stock";
+  static const addStockButton = "Add Stock";
+  static const confirmDelete = "Confirm Delete";
+  static const confirmDeleteMessage = "Are you sure you want to delete this?";
+  static const cancel = "Cancel";
+  static const delete = "Delete";
+  static const edit = "Edit";
+  static const tapped = "Tapped";
+
+  // Colors
+  static const black = "Black";
+  static const brown = "Brown";
+  static const white = "White";
+  static const red = "Red";
+  static const blue = "Blue";
+  static const other = "Other";
+
+  // Validation Messages
+  static const colorRequired = "Color is required";
+  static const actionRequired = "Action is required";
+  static const quantityGreaterThanZero = "Quantity should be greater then 0";
+  static const priceGreaterThanZero = "Price should be greater then 0";
+  static const salePriceGreaterThanPurchase =
+      "Sale Price should be equal or greater then Purchase Price";
+  static const fieldRequired = "is required";
+
+  // Display Text
+  static const sku = "SKU:";
+  static const sizeLabel = "Size:";
+  static const colorLabel = "Color:";
+  static const qty = "Qty:";
+  static const buy = "Buy:";
+  static const sell = "Sell:";
+  static const qtyTotal = "Qty";
+  static const variants = "Variants";
+
+  // Success/Error Messages
+  static const stockAddedSuccessfully = "Stock Added Successfully";
+  static const variantDeletedSuccessfully = "Variant Deleted Successfully";
+  static const somethingWentWrong = "Something went wrong! Try Again";
+
+  // Legacy strings (keeping for compatibility)
   static const theAppForSportsCommunity = "The app for the sports community ";
   static const continueWithFacebook = "Continue with Facebook";
   static const continueWithGoogle = "Continue with Google";

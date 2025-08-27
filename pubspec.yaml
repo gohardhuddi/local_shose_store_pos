@@ -37,7 +37,7 @@ dependencies:
   flutter_bloc: ^9.1.1
   flutter_colorpicker: ^1.1.0
   equatable: ^2.0.7
-  flutter_spinkit: ^5.2.1
+  flutter_spinkit: ^5.2.2
   sqflite: ^2.4.2
   path: ^1.9.1
   path_provider: ^2.1.5
@@ -50,11 +50,17 @@ dependencies:
   dio: ^5.9.0
   connectivity_plus: ^6.1.5
   get_it: ^8.2.0
+  drift_flutter: ^0.2.5
+  drift_sqflite: ^2.0.1
+  floor: ^1.5.0
+  internet_connection_checker: ^3.0.1
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  build_runner: ^2.1.2
+  floor_generator: ^1.4.2
 
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -77,8 +83,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/images/shoe_black_icon.png
-  #   - images/a_dot_ham.jpeg
+    - assets/images/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

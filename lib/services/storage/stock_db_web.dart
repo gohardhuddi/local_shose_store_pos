@@ -575,6 +575,7 @@ class StockDbWeb implements StockDb {
     }
   }
 
+  @override
   Future<Map<String, dynamic>> getUnsyncedPayload() async {
     final products = await getUnsyncedProducts(onlyActive: false);
     final variants = await getUnsyncedVariants(onlyActive: false);

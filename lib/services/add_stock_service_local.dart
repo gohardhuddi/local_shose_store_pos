@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../main.dart'; // expects a global `stockDb` that implements the extended StockDb interface
 
 class StockServiceLocal {
@@ -171,7 +173,9 @@ class StockServiceLocal {
 
   Future<dynamic> getUnSyncPayload() {
     var unsynced = stockDb.getUnsyncedPayload();
-    print(unsynced);
+    if (kDebugMode) {
+      print(unsynced);
+    }
     return unsynced;
   }
 

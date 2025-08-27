@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:local_shoes_store_pos/models/dto/upload_stock_dto.dart';
 import 'package:local_shoes_store_pos/services/add_stock_service_local.dart';
 import 'package:local_shoes_store_pos/services/add_stock_service_remote.dart';
 
@@ -152,5 +155,33 @@ class AddStockRepository {
 
   Future<dynamic> syncProductsToBackend(dynamic mapedList) {
     return _stockServiceRemote.uploadCatalogList(mapedList);
+  }
+
+  // ---------------------------
+  // Business Logic - Data Mapping
+  // ---------------------------
+
+  /// Maps unsynced data to backend format
+  Future<List<Map<String, dynamic>>> mapUnsyncedToBackend(Map<String, dynamic> unsynced) async {
+    if (kDebugMode) {
+      print(jsonEncode(unsynced));
+    }
+    
+    final products = (unsynced['products'] as List? ?? const [])
+        .cast<Map>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
+    final variants = (unsynced['variants'] as List? ?? const [])
+        .cast<Map>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+        
+    final productDtos = ProductDto.buildFromLists(
+      products: products,
+      variants: variants,
+    );
+    
+    return productDtos.map((dto) => dto.toJson()).toList();
   }
 }

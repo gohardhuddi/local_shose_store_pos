@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:local_shoes_store_pos/views/home_screen.dart';
+import 'package:local_shoes_store_pos/views/splash_screen.dart';
 
 import '../views/add_stock_screen.dart';
 import '../views/view_stock_screen.dart';
@@ -7,5 +8,5 @@ import '../views/view_stock_screen.dart';
 final Map<String, WidgetBuilder> routes = {
   '/addStockScreen': (context) => AddStockScreen(),
   '/viewStockScreen': (context) => const ViewStockScreen(),
-  '/': (context) => const HomeScreen(),
+  '/': (context) => const SplashScreen(),
 };

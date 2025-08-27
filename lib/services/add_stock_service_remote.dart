@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:local_shoes_store_pos/helper/global.dart';
 import 'package:local_shoes_store_pos/services/networking/network_service.dart';
 
@@ -23,7 +24,9 @@ class AddStockServiceRemote {
         return response;
       }
     } catch (e) {
-      print(e);
+      if (kDebugMode) {
+        print(e);
+      }
       throw Exception(e);
     }
   }
