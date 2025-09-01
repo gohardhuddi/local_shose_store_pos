@@ -100,6 +100,7 @@ class CustomStrings {
   // Success/Error Messages
   static const stockAddedSuccessfully = "Stock Added Successfully";
   static const variantDeletedSuccessfully = "Variant Deleted Successfully";
+  static const movementAddedSuccessfully = "Movement Added Successfully";
   static const somethingWentWrong = "Something went wrong! Try Again";
 
   // Legacy strings (keeping for compatibility)

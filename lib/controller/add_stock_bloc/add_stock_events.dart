@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+enum StockMovementType { purchaseIn, saleOut, returnStock, transfer }
+
 sealed class AddStockEvents extends Equatable {
   @override
   List<Object> get props => [];
@@ -59,12 +61,12 @@ class GetUnSyncedStockFromDB extends AddStockEvents {
 
 class DeleteVariantByIdEvent extends AddStockEvents {
   final String variantID;
+
   DeleteVariantByIdEvent({required this.variantID});
+
   @override
   List<Object> get props => [variantID];
 }
-
-
 
 class EditStockVariant extends AddStockEvents {
   final String size;
@@ -95,4 +97,19 @@ class EditStockVariant extends AddStockEvents {
     suggestedSalePrice,
     size,
   ];
+}
+
+class AddStockMovementEvent extends AddStockEvents {
+  final String productCodeSku;
+  final StockMovementType movementType;
+  final String quantity;
+
+  AddStockMovementEvent({
+    required this.productCodeSku,
+    required this.movementType,
+    required this.quantity,
+  });
+
+  @override
+  List<Object> get props => [productCodeSku, movementType, quantity];
 }

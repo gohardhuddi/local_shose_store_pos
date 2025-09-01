@@ -15,6 +15,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
     on<GetStockFromDB>(_onGetAllStock);
     on<GetUnSyncedStockFromDB>(_onGetAllUnsyncedStock);
     on<DeleteVariantByIdEvent>(_onDeleteVariantById);
+    on<AddStockMovementEvent>(_onAddStockMovementToDB);
   }
 
   Future<void> _onAddStockToDB(
@@ -64,9 +65,6 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       isSynced: false,
     );
 
-    // Optionally reload list:
-    // await _reloadStock(emit);
-
     emit(AddStockSuccessState());
   }
 
@@ -110,5 +108,22 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
     } catch (e) {
       emit(AddStockErrorState());
     }
+  }
+
+  /// record the movement of the stock
+  Future<void> _onAddStockMovementToDB(
+    AddStockMovementEvent event,
+    Emitter<AddStockStates> emit,
+  ) async {
+    emit(AddStockLoadingState());
+    await _addStockRepo.addInventoryMovementRepo(
+      productCodeSku: event.productCodeSku,
+      action: event.movementType.toString(),
+      quantity: int.parse(event.quantity),
+      movementId: const Uuid().v4(),
+      dateTime: DateTime.now().toIso8601String(),
+      isSynced: false,
+    );
+    emit(MovementsSuccessState());
   }
 }

@@ -35,7 +35,6 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_bloc: ^9.1.1
-  flutter_colorpicker: ^1.1.0
   equatable: ^2.0.7
   flutter_spinkit: ^5.2.2
   sqflite: ^2.4.2
@@ -45,13 +44,10 @@ dependencies:
   sembast_web: ^2.4.0
   persistent_bottom_nav_bar: ^6.2.1
   font_awesome_flutter: ^10.9.0
-  stream_transform: ^2.1.0
   uuid: ^4.5.1
   dio: ^5.9.0
   connectivity_plus: ^6.1.5
   get_it: ^8.2.0
-  drift_flutter: ^0.2.5
-  drift_sqflite: ^2.0.1
   floor: ^1.5.0
   internet_connection_checker: ^3.0.1
 

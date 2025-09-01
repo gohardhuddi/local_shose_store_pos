@@ -84,7 +84,7 @@ class _$AppDatabase extends AppDatabase {
     Callback? callback,
   ]) async {
     final databaseOptions = sqflite.OpenDatabaseOptions(
-      version: 6,
+      version: 8,
       onConfigure: (database) async {
         await database.execute('PRAGMA foreign_keys = ON');
         await callback?.onConfigure?.call(database);
@@ -104,7 +104,7 @@ class _$AppDatabase extends AppDatabase {
         await database.execute(
             'CREATE TABLE IF NOT EXISTS `product_variants` (`product_variant_id` INTEGER, `product_id` INTEGER NOT NULL, `size_eu` INTEGER NOT NULL, `color_name` TEXT NOT NULL, `color_hex` TEXT, `sku` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `purchase_price` REAL NOT NULL, `sale_price` REAL, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON UPDATE NO ACTION ON DELETE CASCADE, PRIMARY KEY (`product_variant_id`))');
         await database.execute(
-            'CREATE TABLE IF NOT EXISTS `inventory_movements` (`movement_id` TEXT NOT NULL, `product_variant_id` INTEGER NOT NULL, `quantity` INTEGER NOT NULL, `action` TEXT NOT NULL, `date_time` TEXT NOT NULL, `is_synced` INTEGER NOT NULL, FOREIGN KEY (`product_variant_id`) REFERENCES `product_variants` (`product_variant_id`) ON UPDATE NO ACTION ON DELETE CASCADE, PRIMARY KEY (`movement_id`))');
+            'CREATE TABLE IF NOT EXISTS `inventory_movements` (`movement_id` TEXT NOT NULL, `product_variant_id` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `action` TEXT NOT NULL, `date_time` TEXT NOT NULL, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`movement_id`))');
         await database.execute(
             'CREATE UNIQUE INDEX `index_products_article_code` ON `products` (`article_code`)');
         await database.execute(
@@ -483,6 +483,27 @@ class _$ProductVariantDao extends ProductVariantDao {
   }
 
   @override
+  Future<List<ProductVariant>> findBySkuLower(String skuLower) async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM product_variants WHERE lower(sku) = ?1 LIMIT 1',
+        mapper: (Map<String, Object?> row) => ProductVariant(
+            id: row['product_variant_id'] as int?,
+            productId: row['product_id'] as int,
+            sizeEu: row['size_eu'] as int,
+            colorName: row['color_name'] as String,
+            colorHex: row['color_hex'] as String?,
+            sku: row['sku'] as String,
+            quantity: row['quantity'] as int,
+            purchasePrice: row['purchase_price'] as double,
+            salePrice: row['sale_price'] as double?,
+            isActive: row['is_active'] as int,
+            isSynced: row['is_synced'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String),
+        arguments: [skuLower]);
+  }
+
+  @override
   Future<int> insertVariant(ProductVariant v) {
     return _productVariantInsertionAdapter.insertAndReturnId(
         v, OnConflictStrategy.abort);
@@ -521,24 +542,24 @@ class _$InventoryMovementDao extends InventoryMovementDao {
   final InsertionAdapter<InventoryMovement> _inventoryMovementInsertionAdapter;
 
   @override
-  Future<String?> findExisting(String id) async {
-    return _queryAdapter.query(
-        'SELECT movement_id FROM inventory_movements WHERE movement_id = ?1 LIMIT 1',
-        mapper: (Map<String, Object?> row) => row.values.first as String,
-        arguments: [id]);
-  }
-
-  @override
-  Future<InventoryMovement?> findByMovementId(String id) async {
+  Future<InventoryMovement?> findByMovementId(String movementId) async {
     return _queryAdapter.query(
         'SELECT * FROM inventory_movements WHERE movement_id = ?1 LIMIT 1',
         mapper: (Map<String, Object?> row) => InventoryMovement(
             movementId: row['movement_id'] as String,
-            productVariantId: row['product_variant_id'] as int,
+            productVariantId: row['product_variant_id'] as String,
             quantity: row['quantity'] as int,
             action: row['action'] as String,
             dateTime: row['date_time'] as String,
             isSynced: row['is_synced'] as int),
+        arguments: [movementId]);
+  }
+
+  @override
+  Future<String?> findExisting(String id) async {
+    return _queryAdapter.query(
+        'SELECT movement_id FROM inventory_movements WHERE movement_id = ?1 LIMIT 1',
+        mapper: (Map<String, Object?> row) => row.values.first as String,
         arguments: [id]);
   }
 
@@ -548,7 +569,7 @@ class _$InventoryMovementDao extends InventoryMovementDao {
         'SELECT * FROM inventory_movements WHERE is_synced = 0',
         mapper: (Map<String, Object?> row) => InventoryMovement(
             movementId: row['movement_id'] as String,
-            productVariantId: row['product_variant_id'] as int,
+            productVariantId: row['product_variant_id'] as String,
             quantity: row['quantity'] as int,
             action: row['action'] as String,
             dateTime: row['date_time'] as String,
@@ -563,8 +584,8 @@ class _$InventoryMovementDao extends InventoryMovementDao {
   }
 
   @override
-  Future<void> insertMovement(InventoryMovement m) async {
+  Future<void> insertMovement(InventoryMovement movement) async {
     await _inventoryMovementInsertionAdapter.insert(
-        m, OnConflictStrategy.abort);
+        movement, OnConflictStrategy.abort);
   }
 }

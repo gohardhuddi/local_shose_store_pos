@@ -191,61 +191,26 @@ class _EditStockScreenState extends State<EditStockScreen> {
                         fieldName: CustomStrings.productCodeSku,
                       ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.44,
-                          child: CustomTextField(
-                            textEditingController: quantityController,
-                            labelText: CustomStrings.quantity,
-                            hintText: CustomStrings.quantityHint,
-                            keyboardType: TextInputType.number,
-                            validator: (value) {
-                              var decision = requiredFieldValidator(
-                                value: value,
-                                fieldName: CustomStrings.quantity,
-                              );
-                              if (decision == null) {
-                                if (int.tryParse(value ?? "0")! > 0) {
-                                  return decision = null;
-                                } else {
-                                  return decision =
-                                      CustomStrings.quantityGreaterThanZero;
-                                }
-                              }
-                              return decision;
-                            },
-                          ),
-                        ),
-                        SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.44,
-                          child: DropdownButtonFormField<String>(
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            value: selectedAction,
-                            decoration: InputDecoration(
-                              labelText: CustomStrings.action,
-                              border: OutlineInputBorder(),
-                            ),
-                            items: actions.map((action) {
-                              return DropdownMenuItem(
-                                value: action,
-                                child: Text(action),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              selectedAction = value;
-                            },
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return CustomStrings.actionRequired;
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ],
+                    CustomTextField(
+                      textEditingController: quantityController,
+                      labelText: CustomStrings.quantity,
+                      hintText: CustomStrings.quantityHint,
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        var decision = requiredFieldValidator(
+                          value: value,
+                          fieldName: CustomStrings.quantity,
+                        );
+                        if (decision == null) {
+                          if (int.tryParse(value ?? "0")! > 0) {
+                            return decision = null;
+                          } else {
+                            return decision =
+                                CustomStrings.quantityGreaterThanZero;
+                          }
+                        }
+                        return decision;
+                      },
                     ),
                     CustomTextField(
                       textEditingController: purchasePriceController,
@@ -261,7 +226,8 @@ class _EditStockScreenState extends State<EditStockScreen> {
                           if (int.tryParse(value ?? "0")! > 0) {
                             return decision = null;
                           } else {
-                            return decision = CustomStrings.priceGreaterThanZero;
+                            return decision =
+                                CustomStrings.priceGreaterThanZero;
                           }
                         }
                         return decision;

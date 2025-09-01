@@ -1,12 +1,16 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:local_shoes_store_pos/models/dto/upload_stock_dto.dart';
 import 'package:local_shoes_store_pos/services/add_stock_service_local.dart';
 import 'package:local_shoes_store_pos/services/add_stock_service_remote.dart';
 
+import '../controller/add_stock_bloc/add_stock_events.dart';
+
 class AddStockRepository {
   final StockServiceLocal _stockServiceLocal;
   final AddStockServiceRemote _stockServiceRemote;
+
   AddStockRepository(this._stockServiceLocal, this._stockServiceRemote);
 
   // ---------------------------
@@ -88,8 +92,9 @@ class AddStockRepository {
       movementId: movementId,
       productVariantId: productVariantId,
       quantity: quantity,
-      dateTimeIso: dateTimeIso,
+      dateTimeIso: dateTimeIso.toString(),
       isSynced: isSynced,
+      movementType: StockMovementType.purchaseIn,
     );
   }
 
@@ -112,15 +117,15 @@ class AddStockRepository {
   /// Optional: keep the low-level passthrough for special cases.
   Future<String> addInventoryMovementRepo({
     required String movementId,
-    required String productVariantId,
+    required String productCodeSku,
     required int quantity,
     required String action, // 'add' or 'subtract'
     required String dateTime,
     bool isSynced = false,
   }) {
-    return _stockServiceLocal.addInventoryMovement(
+    return _stockServiceLocal.addInventoryMovementLocalService(
       movementId: movementId,
-      productVariantId: productVariantId,
+      productSkuCode: productCodeSku,
       quantity: quantity,
       action: action,
       dateTime: dateTime,
@@ -133,6 +138,7 @@ class AddStockRepository {
   // ---------------------------
 
   Future<dynamic> getAllStockRepo() => _stockServiceLocal.getAllStock();
+
   Future<dynamic> getUnSyncPayloadRepo() =>
       _stockServiceLocal.getUnSyncPayload();
 
@@ -162,11 +168,13 @@ class AddStockRepository {
   // ---------------------------
 
   /// Maps unsynced data to backend format
-  Future<List<Map<String, dynamic>>> mapUnsyncedToBackend(Map<String, dynamic> unsynced) async {
+  Future<List<Map<String, dynamic>>> mapUnsyncedToBackend(
+    Map<String, dynamic> unsynced,
+  ) async {
     if (kDebugMode) {
       print(jsonEncode(unsynced));
     }
-    
+
     final products = (unsynced['products'] as List? ?? const [])
         .cast<Map>()
         .map((e) => Map<String, dynamic>.from(e as Map))
@@ -176,12 +184,30 @@ class AddStockRepository {
         .cast<Map>()
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
-        
+
     final productDtos = ProductDto.buildFromLists(
       products: products,
       variants: variants,
     );
-    
+
     return productDtos.map((dto) => dto.toJson()).toList();
   }
+
+  // Future<String> addStockMovementToDb({
+  //   required String movementId,
+  //   required String productCodeSku,
+  //   required StockMovementType movementType,
+  //   required String quantity,
+  //   required String dateTimeIso,
+  //   required bool isSynced,
+  // }) {
+  //   return _stockServiceLocal.addStockMovement(
+  //     movementId: movementId,
+  //     productVariantId: productCodeSku,
+  //     movementType: movementType,
+  //     quantity: quantity,
+  //     dateTimeIso: dateTimeIso,
+  //     isSynced: isSynced,
+  //   );
+  // }
 }

@@ -1,6 +1,7 @@
 // stock_db_web.dart
-// A cleaned-up, battle-ready version with clear add/get/edit stock flows.
-// - Fixes the "ad"/"add" typo & normalization
+// Battle-ready with clear add/get/edit stock flows.
+// - SKU-based dedupe per product (re-adding same SKU bumps quantity, no duplicate variants)
+// - Normalizes SKU to `sku_normalized`
 // - Keeps movement history consistent and idempotent
 // - Adds addStock(), subtractStock(), editStock(), and getStockJson() helpers
 
@@ -29,94 +30,124 @@ class StockDbWeb implements StockDb {
   }
 
   // -------------------------
+  // Helpers (SKU normalization & lookup)
+  // -------------------------
+  String _normalizeSku(String sku) => sku.trim().toLowerCase();
+
+  Future<RecordSnapshot<String, Map<String, Object?>>?>
+  _findVariantByProductAndSku(
+    DatabaseClient txn,
+    String productId,
+    String skuNormalized,
+  ) {
+    return _variants.findFirst(
+      txn,
+      finder: Finder(
+        filter: Filter.and([
+          Filter.equals('product_id', productId),
+          Filter.equals('sku_normalized', skuNormalized),
+          // ignore soft-deleted variants
+          Filter.or([
+            Filter.equals('is_deleted', 0),
+            Filter.notEquals('is_deleted', 1),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  // -------------------------
   // Movements (core primitive)
   // -------------------------
   /// Core primitive to apply a stock movement to a variant.
   /// - Idempotent by `movementId` (re-using the same id won't double-apply).
   /// - `action` must be 'add' or 'subtract'.
+  // Allowed canonical movement types kept in one place
+  static const kAllowedActions = <String>{
+    'purchase_in',
+    'sale_out',
+    'return_in',
+    'return_out',
+    'transfer_in',
+    'transfer_out',
+    'adjustment_pos',
+    'adjustment_neg',
+    'damage',
+    'stocktake_correction',
+  };
+  String _normalizeActionEnumStyle(String action) {
+    var raw = action.trim();
+
+    // Handle enum-style values: "stockmovementtype.purchasein"
+    if (raw.startsWith('StockMovementType.')) {
+      raw = raw.replaceFirst('StockMovementType.', '');
+    }
+
+    // Convert camelCase to snake_case
+    // purchaseIn -> purchase_in
+    var raw_modified = raw.replaceAllMapped(
+      RegExp(r'([a-z])([A-Z])'),
+      (m) => '${m[1]}_${m[2]}'.toLowerCase(),
+    );
+
+    if (kAllowedActions.contains(raw_modified)) {
+      return raw;
+    }
+
+    throw ArgumentError.value(
+      action,
+      'action',
+      'Must be one of: ${kAllowedActions.join(", ")}',
+    );
+  }
+
+  @override
   Future<String> addInventoryMovement({
     required String movementId,
-    required String productVariantId, // 🔁 use variant id, not SKU
+    required String productVariantId, // variant id
     required int quantity,
-    required String action, // 'add' or 'subtract'
+    required String action, // must be one of kAllowedActions
     required String dateTime,
     bool isSynced = false,
   }) async {
-    // Normalize and validate action keyword
-    final normalizedAction = action.toLowerCase().trim();
-    final isAdd = normalizedAction == 'add';
-    final isSubtract = normalizedAction == 'subtract';
-
-    if (!isAdd && !isSubtract) {
-      throw ArgumentError.value(
-        action,
-        'action',
-        'Must be "add" or "subtract"',
-      );
-    }
+    // 0) Validate
+    final normalizedAction = _normalizeActionEnumStyle(action);
     if (quantity <= 0) {
       throw ArgumentError.value(quantity, 'quantity', 'Must be > 0');
     }
 
+    // Only write to movements (still idempotent)
     return _db.transaction((txn) async {
-      // 1) Idempotency: if movement already exists, don’t apply delta again
-      final existingMovement = await _movements.findFirst(
+      // 1) Idempotency
+      final existing = await _movements.findFirst(
         txn,
         finder: Finder(filter: Filter.equals('movement_id', movementId)),
       );
-      if (existingMovement != null) {
-        // Movement already recorded; return its key for safety.
-        return existingMovement.key.toString();
-      }
+      if (existing != null) return existing.key.toString();
 
-      // 2) Find variant by product_variant_id
+      // 2) Optional: ensure variant exists (read-only). Remove if not needed.
       final variantRec = await _variants.findFirst(
         txn,
         finder: Finder(
-          filter: Filter.equals('product_variant_id', productVariantId),
+          filter: Filter.equals(
+            'sku_normalized',
+            productVariantId.toLowerCase(),
+          ),
         ),
       );
       if (variantRec == null) {
         throw StateError('Variant not found: $productVariantId');
       }
 
-      final variantData = Map<String, dynamic>.from(variantRec.value as Map);
-      final currentQty = (variantData['quantity'] as int?) ?? 0;
-
-      // 3) Compute delta from action
-      final delta = isAdd ? quantity : -quantity;
-
-      // 4) Apply delta (block negatives)
-      final newQty = currentQty + delta;
-      if (newQty < 0) {
-        throw StateError(
-          'Insufficient stock for variant $productVariantId: current=$currentQty, subtract=$quantity',
-        );
-      }
-
-      // 5) Update variant
-      final now = DateTime.now().toIso8601String();
-      await _variants.record(variantRec.key).update(txn, {
-        'quantity': newQty,
-        'updated_at': now,
-        'is_synced': 0,
-      });
-
-      // 6) Record the movement
+      // 3) Write ONLY to movements table
       await _movements.record(movementId).put(txn, {
         'movement_id': movementId,
-        'product_variant_id': productVariantId, // store variant id
+        'product_variant_id': productVariantId,
         'quantity': quantity,
-        'action': isAdd ? 'add' : 'subtract', // store normalized keyword
+        'action': normalizedAction,
         'date_time': dateTime,
         'is_synced': isSynced ? 1 : 0,
       });
-
-      // 7) Keep product active state in sync
-      final productId = variantData['product_id'] as String?;
-      if (productId != null) {
-        await _recomputeProductActive(txn, productId);
-      }
 
       return movementId;
     });
@@ -164,7 +195,9 @@ class StockDbWeb implements StockDb {
       _db,
       finder: Finder(filter: Filter.equals('is_synced', 0)),
     );
-    return records.map((r) => {'id': r.key, ...r.value}).toList();
+    return records
+        .map((r) => {'id': r.key, ...Map<String, dynamic>.from(r.value)})
+        .toList();
   }
 
   /// Mark a movement synced via its movement_id
@@ -217,7 +250,7 @@ class StockDbWeb implements StockDb {
   }
 
   // -------------------------
-  // Variants (create/update)
+  // Variants (create/update) with SKU-based dedupe per product
   // -------------------------
   @override
   Future<String> upsertVariant({
@@ -234,23 +267,61 @@ class StockDbWeb implements StockDb {
   }) async {
     final now = DateTime.now().toIso8601String();
     final uuid = Uuid();
+    final skuNorm = _normalizeSku(sku);
 
     return await _db.transaction((txn) async {
-      final existing = await _variants.findFirst(
+      // If variantID is provided, update that exact record.
+      if (variantID != null && variantID.isNotEmpty) {
+        final existing = await _variants.findFirst(
+          txn,
+          finder: Finder(
+            filter: Filter.equals('product_variant_id', variantID),
+          ),
+        );
+
+        if (existing != null) {
+          final existingData = Map<String, Object?>.from(existing.value);
+          final currentQty = (existingData['quantity'] as int?) ?? 0;
+
+          await _variants.record(existing.key).update(txn, {
+            'product_id': productId,
+            'size_eu': sizeEu,
+            'color_name': colorName,
+            'color_hex': colorHex,
+            'sku': sku,
+            'sku_normalized': skuNorm,
+            'quantity': isEdit == true ? quantity : currentQty + quantity,
+            'purchase_price': purchasePrice,
+            'sale_price': salePrice,
+            'updated_at': now,
+            'is_active': 1,
+            'is_synced': 0,
+          });
+
+          await _recomputeProductActive(txn, productId);
+          return existing.key.toString();
+        }
+        // If not found, fall-through to creation/merge.
+      }
+
+      // No variantID (or not found): enforce uniqueness by (productId, sku_normalized)
+      final sameSku = await _findVariantByProductAndSku(
         txn,
-        finder: Finder(filter: Filter.equals('product_variant_id', variantID)),
+        productId,
+        skuNorm,
       );
+      if (sameSku != null) {
+        // Merge: add to quantity (or set exact if isEdit)
+        final v = Map<String, Object?>.from(sameSku.value);
+        final currentQty = (v['quantity'] as int?) ?? 0;
 
-      if (existing != null) {
-        final existingData = existing.value;
-        final currentQty = (existingData['quantity'] as int?) ?? 0;
-
-        await _variants.record(existing.key).update(txn, {
+        await _variants.record(sameSku.key).update(txn, {
           'product_id': productId,
           'size_eu': sizeEu,
           'color_name': colorName,
           'color_hex': colorHex,
           'sku': sku,
+          'sku_normalized': skuNorm,
           'quantity': isEdit == true ? quantity : currentQty + quantity,
           'purchase_price': purchasePrice,
           'sale_price': salePrice,
@@ -260,9 +331,10 @@ class StockDbWeb implements StockDb {
         });
 
         await _recomputeProductActive(txn, productId);
-        return existing.key.toString();
+        return sameSku.key.toString();
       }
 
+      // Create a brand new variant
       final variantGuid = uuid.v4();
       await _variants.record(variantGuid).put(txn, {
         'product_variant_id': variantGuid,
@@ -271,6 +343,7 @@ class StockDbWeb implements StockDb {
         'color_name': colorName,
         'color_hex': colorHex,
         'sku': sku,
+        'sku_normalized': skuNorm,
         'quantity': quantity,
         'purchase_price': purchasePrice,
         'sale_price': salePrice,
@@ -339,7 +412,7 @@ class StockDbWeb implements StockDb {
         if (sizeEu != null) 'size_eu': sizeEu,
         if (colorName != null) 'color_name': colorName,
         if (colorHex != null) 'color_hex': colorHex,
-        if (sku != null) 'sku': sku,
+        if (sku != null) ...{'sku': sku, 'sku_normalized': _normalizeSku(sku)},
         if (purchasePrice != null) 'purchase_price': purchasePrice,
         if (salePrice != null) 'sale_price': salePrice,
         if (newQuantity != null) 'quantity': newQuantity,
@@ -539,7 +612,9 @@ class StockDbWeb implements StockDb {
         : Filter.equals('is_synced', 0);
 
     final records = await _variants.find(_db, finder: Finder(filter: filter));
-    return records.map((r) => {'id': r.key, ...r.value}).toList();
+    return records
+        .map((r) => {'id': r.key, ...Map<String, dynamic>.from(r.value)})
+        .toList();
   }
 
   /// Products where is_synced == 0 (optionally only active)
@@ -554,7 +629,9 @@ class StockDbWeb implements StockDb {
         : Filter.equals('is_synced', 0);
 
     final records = await _products.find(_db, finder: Finder(filter: filter));
-    return records.map((r) => {'id': r.key, ...r.value}).toList();
+    return records
+        .map((r) => {'id': r.key, ...Map<String, dynamic>.from(r.value)})
+        .toList();
   }
 
   /// Mark a product synced by its productId (record key)
@@ -575,11 +652,42 @@ class StockDbWeb implements StockDb {
     }
   }
 
+  // -------------------------
+  // 🔧 Match StockDb's abstract signature exactly
+  // -------------------------
   @override
-  Future<Map<String, dynamic>> getUnsyncedPayload() async {
+  Future<Map<String, List<Map<String, dynamic>>>> getUnsyncedPayload() async {
     final products = await getUnsyncedProducts(onlyActive: false);
     final variants = await getUnsyncedVariants(onlyActive: false);
     final movements = await getUnsyncedMovements();
-    return {'products': products, 'variants': variants, 'movements': movements};
+
+    // Ensure precise typing on return
+    return <String, List<Map<String, dynamic>>>{
+      'products': products.map((e) => Map<String, dynamic>.from(e)).toList(),
+      'variants': variants.map((e) => Map<String, dynamic>.from(e)).toList(),
+      'movements': movements.map((e) => Map<String, dynamic>.from(e)).toList(),
+    };
+  }
+
+  // -------------------------
+  // One-time maintenance (optional)
+  // -------------------------
+  /// Backfill `sku_normalized` for existing rows.
+  Future<void> backfillSkuNormalized() async {
+    await _db.transaction((txn) async {
+      final records = await _variants.find(txn);
+      for (final r in records) {
+        final v = Map<String, Object?>.from(r.value);
+        final rawSku = (v['sku'] ?? '').toString();
+        final norm = _normalizeSku(rawSku);
+        if (v['sku_normalized'] != norm) {
+          await _variants.record(r.key).update(txn, {
+            'sku_normalized': norm,
+            'updated_at': DateTime.now().toIso8601String(),
+            'is_synced': 0,
+          });
+        }
+      }
+    });
   }
 }

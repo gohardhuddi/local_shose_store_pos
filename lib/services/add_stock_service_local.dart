@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_events.dart';
 
 import '../main.dart'; // expects a global `stockDb` that implements the extended StockDb interface
 
@@ -106,15 +107,17 @@ class StockServiceLocal {
     required String movementId,
     required String productVariantId,
     required String quantity,
-    String? dateTimeIso,
+    required String dateTimeIso,
     bool isSynced = false,
+    required StockMovementType movementType,
   }) async {
-    return stockDb.addStock(
+    return stockDb.addInventoryMovement(
       movementId: movementId,
       productVariantId: productVariantId,
       quantity: _parseInt('quantity', quantity),
-      dateTimeIso: dateTimeIso,
+      dateTime: dateTimeIso,
       isSynced: isSynced,
+      action: movementType.toString(),
     );
   }
 
@@ -135,9 +138,9 @@ class StockServiceLocal {
   }
 
   /// Low-level passthrough (if you really want to call it directly).
-  Future<String> addInventoryMovement({
+  Future<String> addInventoryMovementLocalService({
     required String movementId,
-    required String productVariantId,
+    required String productSkuCode,
     required int quantity,
     required String action, // 'add' or 'subtract'
     required String dateTime,
@@ -145,7 +148,7 @@ class StockServiceLocal {
   }) async {
     return stockDb.addInventoryMovement(
       movementId: movementId,
-      productVariantId: productVariantId,
+      productVariantId: productSkuCode,
       quantity: quantity,
       action: action,
       dateTime: dateTime,

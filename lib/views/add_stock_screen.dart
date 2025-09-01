@@ -13,7 +13,9 @@ import '../controller/add_stock_bloc/add_stock_states.dart';
 class AddStockScreen extends StatefulWidget {
   StockModel? stock;
   VariantModel? varient;
+
   AddStockScreen({super.key, this.stock, this.varient});
+
   @override
   State<AddStockScreen> createState() => _AddStockScreenState();
 }
@@ -39,6 +41,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
   TextEditingController sizeController = TextEditingController();
   TextEditingController articleNameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
   @override
   void initState() {
     final v = widget.varient;
@@ -69,6 +72,13 @@ class _AddStockScreenState extends State<AddStockScreen> {
               child: BlocListener<AddStockBloc, AddStockStates>(
                 listener: (BuildContext context, state) {
                   if (state is AddStockSuccessState) {
+                    context.read<AddStockBloc>().add(
+                      AddStockMovementEvent(
+                        productCodeSku: productCodeSKUController.text.trim(),
+                        movementType: StockMovementType.purchaseIn,
+                        quantity: quantityController.text.trim(),
+                      ),
+                    );
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -275,7 +285,8 @@ class _AddStockScreenState extends State<AddStockScreen> {
                           if (int.tryParse(value ?? "0")! > 0) {
                             return decision = null;
                           } else {
-                            return decision = CustomStrings.priceGreaterThanZero;
+                            return decision =
+                                CustomStrings.priceGreaterThanZero;
                           }
                         }
                         return decision;

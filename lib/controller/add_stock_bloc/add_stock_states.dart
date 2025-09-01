@@ -40,3 +40,10 @@ class DeleteVariantByIdSuccessState extends AddStockStates {
   @override
   List<Object> get props => [success];
 }
+
+class MovementsSuccessState extends AddStockStates {
+  final String success = CustomStrings.movementAddedSuccessfully;
+
+  @override
+  List<Object> get props => [success];
+}

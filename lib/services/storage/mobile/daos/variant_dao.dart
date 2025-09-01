@@ -15,9 +15,7 @@ abstract class ProductVariantDao {
   )
   Future<ProductVariant?> findById(int id);
 
-  @Query(
-    'SELECT * FROM product_variants WHERE product_variant_id = :id',
-  )
+  @Query('SELECT * FROM product_variants WHERE product_variant_id = :id')
   Future<List<ProductVariant>> findByVariantId(int id);
 
   @Query('SELECT * FROM product_variants WHERE sku = :sku LIMIT 1')
@@ -54,4 +52,7 @@ abstract class ProductVariantDao {
 
   @Query('SELECT * FROM product_variants WHERE product_id = :productId')
   Future<List<ProductVariant>> findByProductId(int productId);
+  // Look up by SKU (case-insensitive) — no extra column needed
+  @Query('SELECT * FROM product_variants WHERE lower(sku) = :skuLower LIMIT 1')
+  Future<List<ProductVariant>> findBySkuLower(String skuLower);
 }

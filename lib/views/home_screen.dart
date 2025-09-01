@@ -81,7 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: _controller,
           screens: _buildScreens(),
           items: _navBarsItems(context),
-
           backgroundColor: bgColor, // <- was null before
           handleAndroidBackButtonPress: true,
           resizeToAvoidBottomInset: true,
