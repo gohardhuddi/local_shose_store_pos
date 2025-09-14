@@ -31,7 +31,12 @@ class _ConnectivitySnackListenerState extends State<ConnectivitySnackListener> {
         switch (state.status) {
           case ConnectivityStatus.noInternet:
             _wasDisconnected = true; // mark as disconnected
-            bar = _buildBar("⦸⚪ You're offline", Colors.red);
+            bar = _buildBar(
+              "⦸⚪ You're offline",
+              Colors.red,
+              duration: const Duration(seconds: 5),
+            );
+
             break;
 
           case ConnectivityStatus.internetOnlyBackendDown:
@@ -39,6 +44,7 @@ class _ConnectivitySnackListenerState extends State<ConnectivitySnackListener> {
             bar = _buildBar(
               "⚠️⚪ Internet is up, but backend is down",
               Colors.orange,
+              duration: const Duration(seconds: 5),
             );
             break;
 

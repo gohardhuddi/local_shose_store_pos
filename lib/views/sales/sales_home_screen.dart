@@ -3,22 +3,25 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_bloc.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_events.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_states.dart';
+import 'package:local_shoes_store_pos/controller/sales_bloc/sales_states.dart';
 import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/models/stock_model.dart';
-import 'package:local_shoes_store_pos/views/add_stock_screen.dart';
-import 'package:local_shoes_store_pos/views/edit_stock_screen.dart';
 import 'package:local_shoes_store_pos/views/view_helpers/search_helper.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
-class ViewStockScreen extends StatefulWidget {
-  const ViewStockScreen({super.key, this.onOpenDetails});
+import '../../controller/sales_bloc/sales_bloc.dart';
+import '../../controller/sales_bloc/sales_events.dart';
+import 'cart_screen.dart';
+
+class SalesHomeScreen extends StatefulWidget {
+  const SalesHomeScreen({super.key, this.onOpenDetails});
   final void Function(String sku)? onOpenDetails;
 
   @override
-  State<ViewStockScreen> createState() => _ViewStockScreenState();
+  State<SalesHomeScreen> createState() => _SalesHomeScreenState();
 }
 
-class _ViewStockScreenState extends State<ViewStockScreen> {
+class _SalesHomeScreenState extends State<SalesHomeScreen> {
   List<StockModel> _allStock = [];
   List<StockModel> _filteredStock = [];
   String _searchQuery = '';
@@ -31,7 +34,6 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
 
   void _load() {
     context.read<AddStockBloc>().add(GetStockFromDB());
-    // context.read<AddStockBloc>().add(GetUnSyncedStockFromDB());
   }
 
   void _onSearchChanged(String query) {
@@ -46,7 +48,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: Text('${CustomStrings.shopName} ${CustomStrings.stockTitle}'),
+        title: Text(CustomStrings.saleScreenHeading),
         centerTitle: true,
       ),
       body: Column(
@@ -66,9 +68,9 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
             ),
           ),
           Expanded(
-            child: BlocListener<AddStockBloc, AddStockStates>(
+            child: BlocListener<SalesBloc, SalesStates>(
               listener: (BuildContext context, state) {
-                if (state is DeleteVariantByIdSuccessState) {
+                if (state is VariantAddedToCartSuccessState) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(state.success),
@@ -92,7 +94,8 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                         _searchQuery,
                       );
                     } else {
-                      _filteredStock = _allStock;
+                      //  _filteredStock = _allStock;
+                      return Center(child: Text("Today Sales 12000"));
                     }
 
                     if (_filteredStock.isEmpty) {
@@ -162,114 +165,19 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                                             '${CustomStrings.sku} ${v.sku}\n${CustomStrings.sizeLabel} ${v.size}\n${CustomStrings.colorLabel} ${v.colorName}',
                                           ),
                                           subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 '${CustomStrings.qty}: ${v.qty}   ${CustomStrings.buy}: ${v.purchasePrice.toStringAsFixed(0)}   ${CustomStrings.sell}: ${v.salePrice.toStringAsFixed(0)}',
                                               ),
-                                              Divider(
-                                                indent: 10,
-                                                endIndent: 10,
-                                                thickness: 2,
-                                              ),
+                                              Divider(thickness: 2),
                                             ],
                                           ),
-                                          trailing: SizedBox(
-                                            width: 100,
-                                            child: Row(
-                                              spacing: 3,
-                                              children: [
-                                                IconButton(
-                                                  tooltip: CustomStrings.edit,
-                                                  onPressed: () {
-                                                    PersistentNavBarNavigator.pushNewScreen(
-                                                      context,
-                                                      screen: EditStockScreen(
-                                                        stock: p,
-                                                        varient: v,
-                                                      ),
-                                                      withNavBar: true,
-                                                      pageTransitionAnimation:
-                                                          PageTransitionAnimation
-                                                              .cupertino,
-                                                    ).then((_) => _load());
-                                                  },
-                                                  icon: Icon(Icons.edit),
-                                                ),
-                                                IconButton(
-                                                  tooltip: CustomStrings.delete,
-                                                  onPressed: () {
-                                                    showDialog(
-                                                      context: context,
-                                                      builder: (BuildContext context) {
-                                                        return AlertDialog(
-                                                          title: Text(
-                                                            CustomStrings
-                                                                .confirmDelete,
-                                                          ),
-                                                          content: Text(
-                                                            CustomStrings
-                                                                .confirmDeleteMessage,
-                                                          ),
-                                                          actions: [
-                                                            TextButton(
-                                                              onPressed: () {
-                                                                Navigator.of(
-                                                                  context,
-                                                                ).pop(); // Close the dialog
-                                                              },
-                                                              child: Text(
-                                                                CustomStrings
-                                                                    .cancel,
-                                                              ),
-                                                            ),
-                                                            TextButton(
-                                                              onPressed: () {
-                                                                context
-                                                                    .read<
-                                                                      AddStockBloc
-                                                                    >()
-                                                                    .add(
-                                                                      DeleteVariantByIdEvent(
-                                                                        variantID:
-                                                                            v.variantId,
-                                                                      ),
-                                                                    );
-                                                                Navigator.pop(
-                                                                  context,
-                                                                );
-                                                              },
-                                                              style: TextButton.styleFrom(
-                                                                foregroundColor:
-                                                                    Colors.red,
-                                                              ),
-                                                              child: Text(
-                                                                CustomStrings
-                                                                    .delete,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        );
-                                                      },
-                                                    );
-                                                  },
-                                                  icon: Icon(Icons.delete),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
+
                                           onTap: () {
-                                            // callback for details if you want
-                                            widget.onOpenDetails?.call(
-                                              v.sku ?? '',
-                                            );
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  '${CustomStrings.tapped} ${v.sku}',
-                                                ),
-                                              ),
+                                            context.read<SalesBloc>().add(
+                                              AddVariantToCart(variant: v),
                                             );
                                           },
                                         ),
@@ -298,16 +206,16 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
         onPressed: () {
           PersistentNavBarNavigator.pushNewScreen(
             context,
-            screen: AddStockScreen(),
+            screen: CartScreen(),
             withNavBar: false,
             pageTransitionAnimation: PageTransitionAnimation.cupertino,
           ).then((_) => _load()); // refresh after returning
         },
         label: Row(
           children: [
-            Icon(Icons.add),
+            Icon(Icons.shopping_cart),
             SizedBox(width: 8),
-            Text(CustomStrings.addStockButton),
+            Text(CustomStrings.viewCartButton),
           ],
         ),
       ),

@@ -12,6 +12,7 @@ import 'package:local_shoes_store_pos/views/view_helpers/resueables/connectivity
 import 'package:local_shoes_store_pos/views/view_helpers/theme.dart';
 
 import 'controller/connectivity_controller/connectivity_bloc.dart';
+import 'controller/sales_bloc/sales_bloc.dart';
 import 'helper/global.dart';
 import 'helper/routes.dart';
 import 'services/storage/stock_db.dart';
@@ -49,6 +50,9 @@ class MyApp extends StatelessWidget {
           BlocProvider<AddStockBloc>(
             create: (context) =>
                 AddStockBloc(context.read<AddStockRepository>()),
+          ),
+          BlocProvider<SalesBloc>(
+            create: (context) => SalesBloc(context.read<AddStockRepository>()),
           ),
           BlocProvider<ConnectivityBloc>(
             create: (context) =>

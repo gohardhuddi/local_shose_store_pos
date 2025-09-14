@@ -63,6 +63,33 @@ class StockModel {
     }
     return [];
   }
+
+  /// copyWith method
+  StockModel copyWith({
+    String? productId,
+    String? brand,
+    String? articleCode,
+    String? articleName,
+    bool? isActive,
+    String? createdAt,
+    String? updatedAt,
+    int? totalQty,
+    int? variantCount,
+    List<VariantModel>? variants,
+  }) {
+    return StockModel(
+      productId: productId ?? this.productId,
+      brand: brand ?? this.brand,
+      articleCode: articleCode ?? this.articleCode,
+      articleName: articleName ?? this.articleName,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      totalQty: totalQty ?? this.totalQty,
+      variantCount: variantCount ?? this.variantCount,
+      variants: variants ?? this.variants,
+    );
+  }
 }
 
 class VariantModel {
@@ -125,4 +152,35 @@ class VariantModel {
     'createdAt': createdAt,
     'updatedAt': updatedAt,
   };
+
+  /// copyWith method
+  VariantModel copyWith({
+    String? variantId,
+    String? sku,
+    int? size,
+    String? colorName,
+    String? colorHex,
+    int? qty,
+    double? purchasePrice,
+    double? salePrice,
+    bool? isActive,
+    bool? isSynced,
+    String? createdAt,
+    String? updatedAt,
+  }) {
+    return VariantModel(
+      variantId: variantId ?? this.variantId,
+      sku: sku ?? this.sku,
+      size: size ?? this.size,
+      colorName: colorName ?? this.colorName,
+      colorHex: colorHex ?? this.colorHex,
+      qty: qty ?? this.qty,
+      purchasePrice: purchasePrice ?? this.purchasePrice,
+      salePrice: salePrice ?? this.salePrice,
+      isActive: isActive ?? this.isActive,
+      isSynced: isSynced ?? this.isSynced,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }

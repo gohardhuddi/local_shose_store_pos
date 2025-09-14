@@ -17,6 +17,8 @@ class CustomImagesPaths {
 
 class CustomStrings {
   static const shopName = "Anarkali Shoes";
+  static const saleScreenHeading = "Anarkali Shoes Sales";
+  static const cartScreenHeading = "Anarkali Shoes Cart";
   static const inventoryManagementSystem = "Inventory Management System";
 
   // Navigation
@@ -63,6 +65,7 @@ class CustomStrings {
   static const noStockYet = "No stock yet. Add some!";
   static const noStock = "No stock";
   static const addStockButton = "Add Stock";
+  static const viewCartButton = "View Cart";
   static const confirmDelete = "Confirm Delete";
   static const confirmDeleteMessage = "Are you sure you want to delete this?";
   static const cancel = "Cancel";
@@ -101,6 +104,7 @@ class CustomStrings {
   static const stockAddedSuccessfully = "Stock Added Successfully";
   static const variantDeletedSuccessfully = "Variant Deleted Successfully";
   static const movementAddedSuccessfully = "Movement Added Successfully";
+  static const itemAddedToCartSuccessfully = "Item Added to Cart Successfully";
   static const somethingWentWrong = "Something went wrong! Try Again";
 
   // Legacy strings (keeping for compatibility)

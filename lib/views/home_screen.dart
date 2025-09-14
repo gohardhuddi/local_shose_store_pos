@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:local_shoes_store_pos/helper/constants.dart';
+import 'package:local_shoes_store_pos/views/sales/sales_home_screen.dart';
 import 'package:local_shoes_store_pos/views/view_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
@@ -23,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Widget> _buildScreens() => [
-    Center(child: Text(CustomStrings.homePage)),
+    SalesHomeScreen(),
     ViewStockScreen(),
     Center(child: Text(CustomStrings.profilePage)),
     MoreScreen(),
@@ -81,7 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: _controller,
           screens: _buildScreens(),
           items: _navBarsItems(context),
-          backgroundColor: bgColor, // <- was null before
+          backgroundColor: bgColor,
+          // <- was null before
           handleAndroidBackButtonPress: true,
           resizeToAvoidBottomInset: true,
           stateManagement: true,
