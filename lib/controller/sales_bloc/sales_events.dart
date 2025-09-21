@@ -78,3 +78,12 @@ class AddVariantToCart extends SalesEvents {
   @override
   List<Object> get props => [variant];
 }
+
+class RemoveVariantFromCart extends SalesEvents {
+  final VariantModel variant;
+
+  RemoveVariantFromCart({required this.variant});
+
+  @override
+  List<Object> get props => [variant];
+}

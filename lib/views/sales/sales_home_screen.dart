@@ -43,6 +43,8 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
     });
   }
 
+  TextEditingController searchController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,6 +58,7 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: TextField(
+              controller: searchController,
               onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: CustomStrings.searchHint,
@@ -179,6 +182,10 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
                                             context.read<SalesBloc>().add(
                                               AddVariantToCart(variant: v),
                                             );
+                                            setState(() {
+                                              _searchQuery = "";
+                                            });
+                                            _onSearchChanged(_searchQuery);
                                           },
                                         ),
                                       ),
@@ -203,7 +210,9 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: "sales",
         onPressed: () {
+          searchController.clear();
           PersistentNavBarNavigator.pushNewScreen(
             context,
             screen: CartScreen(),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,6 +16,7 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     on<DeleteVariantByIdEvent>(_onDeleteVariantById);
     on<AddStockMovementEvent>(_onAddStockMovementToDB);
     on<AddVariantToCart>(_onAddVariantToCart);
+    on<RemoveVariantFromCart>(_onRemoveVariantFromCart);
   }
   List<VariantModel> cartItems = [];
 
@@ -59,7 +62,7 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
       dateTime: DateTime.now().toIso8601String(),
       isSynced: false,
     );
-    emit(VariantAddedToCartSuccessState());
+    //  emit(VariantAddedToCartSuccessState());
   }
 
   Future<void> _onAddVariantToCart(
@@ -68,6 +71,15 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
   ) async {
     emit(SalesLoadingState());
     cartItems.add(event.variant);
-    emit(VariantAddedToCartSuccessState());
+    emit(VariantAddedToCartSuccessState(cartItems: cartItems));
+  }
+
+  Future<void> _onRemoveVariantFromCart(
+    RemoveVariantFromCart event,
+    Emitter<SalesStates> emit,
+  ) async {
+    emit(SalesLoadingState());
+    cartItems.remove(event.variant);
+    emit(VariantAddedToCartSuccessState(cartItems: cartItems));
   }
 }

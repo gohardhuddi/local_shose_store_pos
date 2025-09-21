@@ -295,6 +295,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: "view_stock",
         onPressed: () {
           PersistentNavBarNavigator.pushNewScreen(
             context,

@@ -98,9 +98,10 @@ class VariantModel {
   final int size;
   final String colorName;
   final String? colorHex;
-  final int qty;
+  int qty;
+  int qtyCart = 1;
   final double purchasePrice;
-  final double salePrice;
+  double salePrice;
   final bool isActive;
   final bool isSynced;
   final String createdAt;
