@@ -25,5 +25,5 @@ abstract class ProductDao {
   @Query(
     'UPDATE products SET is_active = :active, updated_at = :updatedAt WHERE product_id = :id',
   )
-  Future<void> setActive(int id, int active, String updatedAt);
+  Future<void> setActive(String id, int active, String updatedAt);
 }

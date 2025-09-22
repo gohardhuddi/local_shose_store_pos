@@ -7,11 +7,11 @@ import 'package:local_shoes_store_pos/services/stock/add_stock_service_remote.da
 
 import '../controller/add_stock_bloc/add_stock_events.dart';
 
-class AddStockRepository {
+class SalesRepository {
   final StockServiceLocal _stockServiceLocal;
   final AddStockServiceRemote _stockServiceRemote;
 
-  AddStockRepository(this._stockServiceLocal, this._stockServiceRemote);
+  SalesRepository(this._stockServiceLocal, this._stockServiceRemote);
 
   // ---------------------------
   // Create / Upsert

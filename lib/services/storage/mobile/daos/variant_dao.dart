@@ -13,10 +13,10 @@ abstract class ProductVariantDao {
   @Query(
     'SELECT * FROM product_variants WHERE product_variant_id = :id LIMIT 1',
   )
-  Future<ProductVariant?> findById(int id);
+  Future<ProductVariant?> findById(String id);
 
   @Query('SELECT * FROM product_variants WHERE product_variant_id = :id')
-  Future<List<ProductVariant>> findByVariantId(int id);
+  Future<List<ProductVariant>> findByVariantId(String id);
 
   @Query('SELECT * FROM product_variants WHERE sku = :sku LIMIT 1')
   Future<ProductVariant?> findBySku(String sku);
@@ -24,7 +24,7 @@ abstract class ProductVariantDao {
   @Query(
     'SELECT COUNT(*) FROM product_variants WHERE product_id = :productId AND is_active = 1',
   )
-  Future<int?> countActiveByProductId(int productId);
+  Future<int?> countActiveByProductId(String productId);
 
   @Query(
     'UPDATE product_variants SET is_synced = 1 WHERE product_variant_id = :id',
@@ -34,15 +34,15 @@ abstract class ProductVariantDao {
   @Query(
     'UPDATE product_variants SET is_active = :active, updated_at = :updatedAt, is_synced = 0 WHERE product_variant_id = :id',
   )
-  Future<void> setActive(int id, int active, String updatedAt);
+  Future<void> setActive(String id, int active, String updatedAt);
 
   @Query(
     'UPDATE product_variants SET is_active = 0, updated_at = :updatedAt, is_synced = 0 WHERE product_variant_id = :id',
   )
-  Future<void> softDelete(int id, String updatedAt);
+  Future<void> softDelete(String id, String updatedAt);
 
   @Query('DELETE FROM product_variants WHERE product_variant_id = :id')
-  Future<void> deleteById(int id);
+  Future<void> deleteById(String id);
 
   @Query('SELECT * FROM product_variants WHERE is_synced = 0')
   Future<List<ProductVariant>> findUnsynced();
@@ -51,7 +51,7 @@ abstract class ProductVariantDao {
   Future<List<ProductVariant>> all();
 
   @Query('SELECT * FROM product_variants WHERE product_id = :productId')
-  Future<List<ProductVariant>> findByProductId(int productId);
+  Future<List<ProductVariant>> findByProductId(String productId);
   // Look up by SKU (case-insensitive) — no extra column needed
   @Query('SELECT * FROM product_variants WHERE lower(sku) = :skuLower LIMIT 1')
   Future<List<ProductVariant>> findBySkuLower(String skuLower);

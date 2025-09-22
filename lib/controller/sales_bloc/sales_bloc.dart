@@ -17,6 +17,7 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     on<AddStockMovementEvent>(_onAddStockMovementToDB);
     on<AddVariantToCart>(_onAddVariantToCart);
     on<RemoveVariantFromCart>(_onRemoveVariantFromCart);
+    on<SoldEvent>(_onSoldEvent);
   }
   List<VariantModel> cartItems = [];
 
@@ -82,4 +83,6 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     cartItems.remove(event.variant);
     emit(VariantAddedToCartSuccessState(cartItems: cartItems));
   }
+
+  Future<void> _onSoldEvent(SoldEvent event, Emitter<SalesStates> emit) async {}
 }

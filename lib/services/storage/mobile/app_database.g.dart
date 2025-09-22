@@ -78,13 +78,17 @@ class _$AppDatabase extends AppDatabase {
 
   InventoryMovementDao? _movementDaoInstance;
 
+  SaleDao? _saleDaoInstance;
+
+  SaleLineDao? _saleLineDaoInstance;
+
   Future<sqflite.Database> open(
     String path,
     List<Migration> migrations, [
     Callback? callback,
   ]) async {
     final databaseOptions = sqflite.OpenDatabaseOptions(
-      version: 8,
+      version: 11,
       onConfigure: (database) async {
         await database.execute('PRAGMA foreign_keys = ON');
         await callback?.onConfigure?.call(database);
@@ -100,11 +104,15 @@ class _$AppDatabase extends AppDatabase {
       },
       onCreate: (database, version) async {
         await database.execute(
-            'CREATE TABLE IF NOT EXISTS `products` (`product_id` INTEGER, `brand` TEXT NOT NULL, `article_code` TEXT NOT NULL, `article_name` TEXT, `notes` TEXT, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY (`product_id`))');
+            'CREATE TABLE IF NOT EXISTS `products` (`product_id` TEXT, `brand` TEXT NOT NULL, `article_code` TEXT NOT NULL, `article_name` TEXT, `notes` TEXT, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY (`product_id`))');
         await database.execute(
-            'CREATE TABLE IF NOT EXISTS `product_variants` (`product_variant_id` INTEGER, `product_id` INTEGER NOT NULL, `size_eu` INTEGER NOT NULL, `color_name` TEXT NOT NULL, `color_hex` TEXT, `sku` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `purchase_price` REAL NOT NULL, `sale_price` REAL, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON UPDATE NO ACTION ON DELETE CASCADE, PRIMARY KEY (`product_variant_id`))');
+            'CREATE TABLE IF NOT EXISTS `product_variants` (`product_variant_id` TEXT, `product_id` TEXT NOT NULL, `size_eu` INTEGER NOT NULL, `color_name` TEXT NOT NULL, `color_hex` TEXT, `sku` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `purchase_price` REAL NOT NULL, `sale_price` REAL, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON UPDATE NO ACTION ON DELETE CASCADE, PRIMARY KEY (`product_variant_id`))');
         await database.execute(
             'CREATE TABLE IF NOT EXISTS `inventory_movements` (`movement_id` TEXT NOT NULL, `product_variant_id` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `action` TEXT NOT NULL, `date_time` TEXT NOT NULL, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`movement_id`))');
+        await database.execute(
+            'CREATE TABLE IF NOT EXISTS `sales` (`sale_id` TEXT NOT NULL, `date_time` TEXT NOT NULL, `customer_id` TEXT, `total_amount` REAL NOT NULL, `discount_amount` REAL NOT NULL, `final_amount` REAL NOT NULL, `payment_type` TEXT NOT NULL, `amount_paid` REAL NOT NULL, `change_returned` REAL NOT NULL, `created_by` TEXT NOT NULL, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`sale_id`))');
+        await database.execute(
+            'CREATE TABLE IF NOT EXISTS `sale_lines` (`sale_line_id` TEXT NOT NULL, `sale_id` TEXT NOT NULL, `variant_id` INTEGER NOT NULL, `qty` INTEGER NOT NULL, `unit_price` REAL NOT NULL, `line_total` REAL NOT NULL, FOREIGN KEY (`sale_id`) REFERENCES `sales` (`sale_id`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`product_variant_id`) ON UPDATE NO ACTION ON DELETE RESTRICT, PRIMARY KEY (`sale_line_id`))');
         await database.execute(
             'CREATE UNIQUE INDEX `index_products_article_code` ON `products` (`article_code`)');
         await database.execute(
@@ -115,6 +123,14 @@ class _$AppDatabase extends AppDatabase {
             'CREATE UNIQUE INDEX `index_product_variants_sku` ON `product_variants` (`sku`)');
         await database.execute(
             'CREATE INDEX `index_inventory_movements_product_variant_id` ON `inventory_movements` (`product_variant_id`)');
+        await database.execute(
+            'CREATE INDEX `index_sales_date_time` ON `sales` (`date_time`)');
+        await database.execute(
+            'CREATE INDEX `index_sales_created_by` ON `sales` (`created_by`)');
+        await database.execute(
+            'CREATE INDEX `index_sale_lines_sale_id` ON `sale_lines` (`sale_id`)');
+        await database.execute(
+            'CREATE INDEX `index_sale_lines_variant_id` ON `sale_lines` (`variant_id`)');
 
         await callback?.onCreate?.call(database, version);
       },
@@ -137,6 +153,16 @@ class _$AppDatabase extends AppDatabase {
   InventoryMovementDao get movementDao {
     return _movementDaoInstance ??=
         _$InventoryMovementDao(database, changeListener);
+  }
+
+  @override
+  SaleDao get saleDao {
+    return _saleDaoInstance ??= _$SaleDao(database, changeListener);
+  }
+
+  @override
+  SaleLineDao get saleLineDao {
+    return _saleLineDaoInstance ??= _$SaleLineDao(database, changeListener);
   }
 }
 
@@ -190,7 +216,7 @@ class _$ProductDao extends ProductDao {
     return _queryAdapter.query(
         'SELECT * FROM products WHERE article_code = ?1 LIMIT 1',
         mapper: (Map<String, Object?> row) => Product(
-            id: row['product_id'] as int?,
+            id: row['product_id'] as String?,
             brand: row['brand'] as String,
             articleCode: row['article_code'] as String,
             articleName: row['article_name'] as String?,
@@ -206,7 +232,7 @@ class _$ProductDao extends ProductDao {
   Future<List<Product>> all() async {
     return _queryAdapter.queryList('SELECT * FROM products',
         mapper: (Map<String, Object?> row) => Product(
-            id: row['product_id'] as int?,
+            id: row['product_id'] as String?,
             brand: row['brand'] as String,
             articleCode: row['article_code'] as String,
             articleName: row['article_name'] as String?,
@@ -221,7 +247,7 @@ class _$ProductDao extends ProductDao {
   Future<List<Product>> findUnsynced() async {
     return _queryAdapter.queryList('SELECT * FROM products WHERE is_synced = 0',
         mapper: (Map<String, Object?> row) => Product(
-            id: row['product_id'] as int?,
+            id: row['product_id'] as String?,
             brand: row['brand'] as String,
             articleCode: row['article_code'] as String,
             articleName: row['article_name'] as String?,
@@ -241,7 +267,7 @@ class _$ProductDao extends ProductDao {
 
   @override
   Future<void> setActive(
-    int id,
+    String id,
     int active,
     String updatedAt,
   ) async {
@@ -317,12 +343,12 @@ class _$ProductVariantDao extends ProductVariantDao {
   final UpdateAdapter<ProductVariant> _productVariantUpdateAdapter;
 
   @override
-  Future<ProductVariant?> findById(int id) async {
+  Future<ProductVariant?> findById(String id) async {
     return _queryAdapter.query(
         'SELECT * FROM product_variants WHERE product_variant_id = ?1 LIMIT 1',
         mapper: (Map<String, Object?> row) => ProductVariant(
-            id: row['product_variant_id'] as int?,
-            productId: row['product_id'] as int,
+            id: row['product_variant_id'] as String?,
+            productId: row['product_id'] as String,
             sizeEu: row['size_eu'] as int,
             colorName: row['color_name'] as String,
             colorHex: row['color_hex'] as String?,
@@ -338,12 +364,12 @@ class _$ProductVariantDao extends ProductVariantDao {
   }
 
   @override
-  Future<List<ProductVariant>> findByVariantId(int id) async {
+  Future<List<ProductVariant>> findByVariantId(String id) async {
     return _queryAdapter.queryList(
         'SELECT * FROM product_variants WHERE product_variant_id = ?1',
         mapper: (Map<String, Object?> row) => ProductVariant(
-            id: row['product_variant_id'] as int?,
-            productId: row['product_id'] as int,
+            id: row['product_variant_id'] as String?,
+            productId: row['product_id'] as String,
             sizeEu: row['size_eu'] as int,
             colorName: row['color_name'] as String,
             colorHex: row['color_hex'] as String?,
@@ -363,8 +389,8 @@ class _$ProductVariantDao extends ProductVariantDao {
     return _queryAdapter.query(
         'SELECT * FROM product_variants WHERE sku = ?1 LIMIT 1',
         mapper: (Map<String, Object?> row) => ProductVariant(
-            id: row['product_variant_id'] as int?,
-            productId: row['product_id'] as int,
+            id: row['product_variant_id'] as String?,
+            productId: row['product_id'] as String,
             sizeEu: row['size_eu'] as int,
             colorName: row['color_name'] as String,
             colorHex: row['color_hex'] as String?,
@@ -380,7 +406,7 @@ class _$ProductVariantDao extends ProductVariantDao {
   }
 
   @override
-  Future<int?> countActiveByProductId(int productId) async {
+  Future<int?> countActiveByProductId(String productId) async {
     return _queryAdapter.query(
         'SELECT COUNT(*) FROM product_variants WHERE product_id = ?1 AND is_active = 1',
         mapper: (Map<String, Object?> row) => row.values.first as int,
@@ -396,7 +422,7 @@ class _$ProductVariantDao extends ProductVariantDao {
 
   @override
   Future<void> setActive(
-    int id,
+    String id,
     int active,
     String updatedAt,
   ) async {
@@ -407,7 +433,7 @@ class _$ProductVariantDao extends ProductVariantDao {
 
   @override
   Future<void> softDelete(
-    int id,
+    String id,
     String updatedAt,
   ) async {
     await _queryAdapter.queryNoReturn(
@@ -416,7 +442,7 @@ class _$ProductVariantDao extends ProductVariantDao {
   }
 
   @override
-  Future<void> deleteById(int id) async {
+  Future<void> deleteById(String id) async {
     await _queryAdapter.queryNoReturn(
         'DELETE FROM product_variants WHERE product_variant_id = ?1',
         arguments: [id]);
@@ -427,8 +453,8 @@ class _$ProductVariantDao extends ProductVariantDao {
     return _queryAdapter.queryList(
         'SELECT * FROM product_variants WHERE is_synced = 0',
         mapper: (Map<String, Object?> row) => ProductVariant(
-            id: row['product_variant_id'] as int?,
-            productId: row['product_id'] as int,
+            id: row['product_variant_id'] as String?,
+            productId: row['product_id'] as String,
             sizeEu: row['size_eu'] as int,
             colorName: row['color_name'] as String,
             colorHex: row['color_hex'] as String?,
@@ -446,8 +472,8 @@ class _$ProductVariantDao extends ProductVariantDao {
   Future<List<ProductVariant>> all() async {
     return _queryAdapter.queryList('SELECT * FROM product_variants',
         mapper: (Map<String, Object?> row) => ProductVariant(
-            id: row['product_variant_id'] as int?,
-            productId: row['product_id'] as int,
+            id: row['product_variant_id'] as String?,
+            productId: row['product_id'] as String,
             sizeEu: row['size_eu'] as int,
             colorName: row['color_name'] as String,
             colorHex: row['color_hex'] as String?,
@@ -462,12 +488,12 @@ class _$ProductVariantDao extends ProductVariantDao {
   }
 
   @override
-  Future<List<ProductVariant>> findByProductId(int productId) async {
+  Future<List<ProductVariant>> findByProductId(String productId) async {
     return _queryAdapter.queryList(
         'SELECT * FROM product_variants WHERE product_id = ?1',
         mapper: (Map<String, Object?> row) => ProductVariant(
-            id: row['product_variant_id'] as int?,
-            productId: row['product_id'] as int,
+            id: row['product_variant_id'] as String?,
+            productId: row['product_id'] as String,
             sizeEu: row['size_eu'] as int,
             colorName: row['color_name'] as String,
             colorHex: row['color_hex'] as String?,
@@ -487,8 +513,8 @@ class _$ProductVariantDao extends ProductVariantDao {
     return _queryAdapter.queryList(
         'SELECT * FROM product_variants WHERE lower(sku) = ?1 LIMIT 1',
         mapper: (Map<String, Object?> row) => ProductVariant(
-            id: row['product_variant_id'] as int?,
-            productId: row['product_id'] as int,
+            id: row['product_variant_id'] as String?,
+            productId: row['product_id'] as String,
             sizeEu: row['size_eu'] as int,
             colorName: row['color_name'] as String,
             colorHex: row['color_hex'] as String?,
@@ -587,5 +613,245 @@ class _$InventoryMovementDao extends InventoryMovementDao {
   Future<void> insertMovement(InventoryMovement movement) async {
     await _inventoryMovementInsertionAdapter.insert(
         movement, OnConflictStrategy.abort);
+  }
+}
+
+class _$SaleDao extends SaleDao {
+  _$SaleDao(
+    this.database,
+    this.changeListener,
+  )   : _queryAdapter = QueryAdapter(database),
+        _saleInsertionAdapter = InsertionAdapter(
+            database,
+            'sales',
+            (Sale item) => <String, Object?>{
+                  'sale_id': item.saleId,
+                  'date_time': item.dateTime,
+                  'customer_id': item.customerId,
+                  'total_amount': item.totalAmount,
+                  'discount_amount': item.discountAmount,
+                  'final_amount': item.finalAmount,
+                  'payment_type': item.paymentType,
+                  'amount_paid': item.amountPaid,
+                  'change_returned': item.changeReturned,
+                  'created_by': item.createdBy,
+                  'is_synced': item.isSynced
+                }),
+        _saleUpdateAdapter = UpdateAdapter(
+            database,
+            'sales',
+            ['sale_id'],
+            (Sale item) => <String, Object?>{
+                  'sale_id': item.saleId,
+                  'date_time': item.dateTime,
+                  'customer_id': item.customerId,
+                  'total_amount': item.totalAmount,
+                  'discount_amount': item.discountAmount,
+                  'final_amount': item.finalAmount,
+                  'payment_type': item.paymentType,
+                  'amount_paid': item.amountPaid,
+                  'change_returned': item.changeReturned,
+                  'created_by': item.createdBy,
+                  'is_synced': item.isSynced
+                }),
+        _saleDeletionAdapter = DeletionAdapter(
+            database,
+            'sales',
+            ['sale_id'],
+            (Sale item) => <String, Object?>{
+                  'sale_id': item.saleId,
+                  'date_time': item.dateTime,
+                  'customer_id': item.customerId,
+                  'total_amount': item.totalAmount,
+                  'discount_amount': item.discountAmount,
+                  'final_amount': item.finalAmount,
+                  'payment_type': item.paymentType,
+                  'amount_paid': item.amountPaid,
+                  'change_returned': item.changeReturned,
+                  'created_by': item.createdBy,
+                  'is_synced': item.isSynced
+                });
+
+  final sqflite.DatabaseExecutor database;
+
+  final StreamController<String> changeListener;
+
+  final QueryAdapter _queryAdapter;
+
+  final InsertionAdapter<Sale> _saleInsertionAdapter;
+
+  final UpdateAdapter<Sale> _saleUpdateAdapter;
+
+  final DeletionAdapter<Sale> _saleDeletionAdapter;
+
+  @override
+  Future<List<Sale>> getAllSales() async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM sales ORDER BY date_time DESC',
+        mapper: (Map<String, Object?> row) => Sale(
+            saleId: row['sale_id'] as String,
+            dateTime: row['date_time'] as String,
+            customerId: row['customer_id'] as String?,
+            totalAmount: row['total_amount'] as double,
+            discountAmount: row['discount_amount'] as double,
+            finalAmount: row['final_amount'] as double,
+            paymentType: row['payment_type'] as String,
+            amountPaid: row['amount_paid'] as double,
+            changeReturned: row['change_returned'] as double,
+            createdBy: row['created_by'] as String,
+            isSynced: row['is_synced'] as int));
+  }
+
+  @override
+  Future<Sale?> findSaleById(String id) async {
+    return _queryAdapter.query('SELECT * FROM sales WHERE sale_id = ?1',
+        mapper: (Map<String, Object?> row) => Sale(
+            saleId: row['sale_id'] as String,
+            dateTime: row['date_time'] as String,
+            customerId: row['customer_id'] as String?,
+            totalAmount: row['total_amount'] as double,
+            discountAmount: row['discount_amount'] as double,
+            finalAmount: row['final_amount'] as double,
+            paymentType: row['payment_type'] as String,
+            amountPaid: row['amount_paid'] as double,
+            changeReturned: row['change_returned'] as double,
+            createdBy: row['created_by'] as String,
+            isSynced: row['is_synced'] as int),
+        arguments: [id]);
+  }
+
+  @override
+  Future<void> clearSales() async {
+    await _queryAdapter.queryNoReturn('DELETE FROM sales');
+  }
+
+  @override
+  Future<void> insertSale(Sale sale) async {
+    await _saleInsertionAdapter.insert(sale, OnConflictStrategy.replace);
+  }
+
+  @override
+  Future<void> insertSales(List<Sale> sales) async {
+    await _saleInsertionAdapter.insertList(sales, OnConflictStrategy.replace);
+  }
+
+  @override
+  Future<void> updateSale(Sale sale) async {
+    await _saleUpdateAdapter.update(sale, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<void> deleteSale(Sale sale) async {
+    await _saleDeletionAdapter.delete(sale);
+  }
+}
+
+class _$SaleLineDao extends SaleLineDao {
+  _$SaleLineDao(
+    this.database,
+    this.changeListener,
+  )   : _queryAdapter = QueryAdapter(database),
+        _saleLineInsertionAdapter = InsertionAdapter(
+            database,
+            'sale_lines',
+            (SaleLine item) => <String, Object?>{
+                  'sale_line_id': item.saleLineId,
+                  'sale_id': item.saleId,
+                  'variant_id': item.variantId,
+                  'qty': item.qty,
+                  'unit_price': item.unitPrice,
+                  'line_total': item.lineTotal
+                }),
+        _saleLineUpdateAdapter = UpdateAdapter(
+            database,
+            'sale_lines',
+            ['sale_line_id'],
+            (SaleLine item) => <String, Object?>{
+                  'sale_line_id': item.saleLineId,
+                  'sale_id': item.saleId,
+                  'variant_id': item.variantId,
+                  'qty': item.qty,
+                  'unit_price': item.unitPrice,
+                  'line_total': item.lineTotal
+                }),
+        _saleLineDeletionAdapter = DeletionAdapter(
+            database,
+            'sale_lines',
+            ['sale_line_id'],
+            (SaleLine item) => <String, Object?>{
+                  'sale_line_id': item.saleLineId,
+                  'sale_id': item.saleId,
+                  'variant_id': item.variantId,
+                  'qty': item.qty,
+                  'unit_price': item.unitPrice,
+                  'line_total': item.lineTotal
+                });
+
+  final sqflite.DatabaseExecutor database;
+
+  final StreamController<String> changeListener;
+
+  final QueryAdapter _queryAdapter;
+
+  final InsertionAdapter<SaleLine> _saleLineInsertionAdapter;
+
+  final UpdateAdapter<SaleLine> _saleLineUpdateAdapter;
+
+  final DeletionAdapter<SaleLine> _saleLineDeletionAdapter;
+
+  @override
+  Future<List<SaleLine>> getLinesForSale(String saleId) async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM sale_lines WHERE sale_id = ?1',
+        mapper: (Map<String, Object?> row) => SaleLine(
+            saleLineId: row['sale_line_id'] as String,
+            saleId: row['sale_id'] as String,
+            variantId: row['variant_id'] as int,
+            qty: row['qty'] as int,
+            unitPrice: row['unit_price'] as double,
+            lineTotal: row['line_total'] as double),
+        arguments: [saleId]);
+  }
+
+  @override
+  Future<SaleLine?> findSaleLineById(String id) async {
+    return _queryAdapter.query(
+        'SELECT * FROM sale_lines WHERE sale_line_id = ?1',
+        mapper: (Map<String, Object?> row) => SaleLine(
+            saleLineId: row['sale_line_id'] as String,
+            saleId: row['sale_id'] as String,
+            variantId: row['variant_id'] as int,
+            qty: row['qty'] as int,
+            unitPrice: row['unit_price'] as double,
+            lineTotal: row['line_total'] as double),
+        arguments: [id]);
+  }
+
+  @override
+  Future<void> clearLinesForSale(String saleId) async {
+    await _queryAdapter.queryNoReturn(
+        'DELETE FROM sale_lines WHERE sale_id = ?1',
+        arguments: [saleId]);
+  }
+
+  @override
+  Future<void> insertSaleLine(SaleLine line) async {
+    await _saleLineInsertionAdapter.insert(line, OnConflictStrategy.replace);
+  }
+
+  @override
+  Future<void> insertSaleLines(List<SaleLine> lines) async {
+    await _saleLineInsertionAdapter.insertList(
+        lines, OnConflictStrategy.replace);
+  }
+
+  @override
+  Future<void> updateSaleLine(SaleLine line) async {
+    await _saleLineUpdateAdapter.update(line, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<void> deleteSaleLine(SaleLine line) async {
+    await _saleLineDeletionAdapter.delete(line);
   }
 }

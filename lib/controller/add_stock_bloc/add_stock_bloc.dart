@@ -103,8 +103,8 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
   ) async {
     emit(AddStockLoadingState());
     try {
-      await _addStockRepo.deleteVariantById(event.variantID);
-      emit(DeleteVariantByIdSuccessState());
+      bool result = await _addStockRepo.deleteVariantById(event.variantID);
+      if (result) emit(DeleteVariantByIdSuccessState());
     } catch (e) {
       emit(AddStockErrorState());
     }

@@ -1,4 +1,5 @@
 import 'package:floor/floor.dart';
+
 import 'products.dart';
 
 @Entity(
@@ -20,10 +21,10 @@ import 'products.dart';
 class ProductVariant {
   @primaryKey
   @ColumnInfo(name: 'product_variant_id')
-  final int? id;
+  final String? id;
 
   @ColumnInfo(name: 'product_id')
-  final int productId;
+  final String productId;
 
   @ColumnInfo(name: 'size_eu')
   final int sizeEu;
@@ -73,8 +74,8 @@ class ProductVariant {
   });
 
   ProductVariant copyWith({
-    int? id,
-    int? productId,
+    String? id,
+    String? productId,
     int? sizeEu,
     String? colorName,
     String? colorHex,

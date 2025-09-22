@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 
 import 'mobile/app_database.dart';
 import 'mobile/entities/inventory_movement.dart';
@@ -48,7 +49,9 @@ class StockDbFloor implements StockDb {
     }
 
     // Create new product
+    final newProductID = const Uuid().v4();
     final product = Product(
+      id: newProductID,
       brand: brand,
       articleCode: articleCode,
       articleName: articleName,
@@ -58,8 +61,8 @@ class StockDbFloor implements StockDb {
       updatedAt: now,
     );
 
-    final id = await db.productDao.insertProduct(product);
-    return id.toString();
+    await db.productDao.insertProduct(product);
+    return newProductID;
   }
 
   // -------------------------
@@ -85,9 +88,7 @@ class StockDbFloor implements StockDb {
 
     if (variantID != null) {
       // Find by variant ID
-      final variants = await db.variantDao.findByVariantId(
-        int.parse(variantID),
-      );
+      final variants = await db.variantDao.findByVariantId(variantID);
       if (variants.isNotEmpty) {
         existing = variants.first;
         existingId = existing.id.toString();
@@ -107,7 +108,7 @@ class StockDbFloor implements StockDb {
       final nextQty = (isEdit == true) ? quantity : (currentQty + quantity);
 
       final updated = existing.copyWith(
-        productId: int.parse(productId),
+        productId: productId,
         sizeEu: sizeEu,
         colorName: colorName,
         colorHex: colorHex,
@@ -126,8 +127,10 @@ class StockDbFloor implements StockDb {
     }
 
     // Insert new variant
+    final newVariantId = const Uuid().v4();
     final variant = ProductVariant(
-      productId: int.parse(productId),
+      id: newVariantId,
+      productId: productId,
       sizeEu: sizeEu,
       colorName: colorName,
       colorHex: colorHex,
@@ -143,7 +146,7 @@ class StockDbFloor implements StockDb {
 
     final newId = await db.variantDao.insertVariant(variant);
     await _recomputeProductActive(productId);
-    return newId.toString();
+    return newVariantId;
   }
 
   // -------------------------
@@ -288,7 +291,7 @@ class StockDbFloor implements StockDb {
     final now = DateTime.now().toIso8601String();
     final when = dateTimeIso ?? now;
 
-    final vid = int.tryParse(productVariantId);
+    final vid = productVariantId;
     if (vid == null) throw ArgumentError('Invalid productVariantId');
 
     final variants = await db.variantDao.findByVariantId(vid);
@@ -311,7 +314,7 @@ class StockDbFloor implements StockDb {
     }
 
     final updatedVariant = variant.copyWith(
-      productId: productId != null ? int.parse(productId) : variant.productId,
+      productId: productId != null ? productId : variant.productId,
       sizeEu: sizeEu ?? variant.sizeEu,
       colorName: colorName ?? variant.colorName,
       colorHex: colorHex ?? variant.colorHex,
@@ -523,7 +526,7 @@ class StockDbFloor implements StockDb {
   // -------------------------
   @override
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
-    final key = int.tryParse(variantId);
+    final key = variantId;
     if (key == null) return false;
 
     if (hard) {
@@ -540,7 +543,7 @@ class StockDbFloor implements StockDb {
   // Internal helpers
   // -------------------------
   Future<void> _recomputeProductActive(String productIdStr) async {
-    final pid = int.tryParse(productIdStr);
+    final pid = productIdStr;
     if (pid == null) return;
 
     final activeCount = await db.variantDao.countActiveByProductId(pid) ?? 0;

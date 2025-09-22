@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_events.dart';
 
-import '../main.dart'; // expects a global `stockDb` that implements the extended StockDb interface
+import '../../main.dart'; // expects a global `stockDb` that implements the extended StockDb interface
 
-class StockServiceLocal {
+class SaleServiceLocal {
   // ---------------------------
   // Helpers
   // ---------------------------
@@ -32,6 +32,38 @@ class StockServiceLocal {
   /// If `isEdit == true`, quantity is set exactly to `quantity`.
   /// If `isEdit == false`, quantity is ADDED to the existing quantity.
   Future<String> addStockToDbService({
+    required String brand,
+    required String articleCode,
+    required String? articleName,
+    required String size,
+    required String color,
+    required String productCodeSku,
+    required String quantity,
+    required String purchasePrice,
+    required String suggestedSalePrice,
+    required bool isEdit,
+  }) async {
+    final productId = await stockDb.upsertProduct(
+      brand: _normStr(brand),
+      articleCode: _normUpper(articleCode),
+      articleName: _normStr(articleName),
+    );
+
+    await stockDb.upsertVariant(
+      productId: productId,
+      sizeEu: _parseInt('size', size),
+      colorName: _normStr(color),
+      sku: _normUpper(productCodeSku),
+      quantity: _parseInt('quantity', quantity),
+      purchasePrice: _parseDouble('purchasePrice', purchasePrice),
+      salePrice: _parseDouble('suggestedSalePrice', suggestedSalePrice),
+      isEdit: isEdit,
+    );
+
+    return productId;
+  }
+
+  Future<String> addSalesToDbService({
     required String brand,
     required String articleCode,
     required String? articleName,

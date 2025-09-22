@@ -9,7 +9,7 @@ import 'package:floor/floor.dart';
 class Product {
   @primaryKey
   @ColumnInfo(name: 'product_id')
-  final int? id;
+  final String? id;
 
   final String brand;
 
@@ -46,7 +46,7 @@ class Product {
   });
 
   Product copyWith({
-    int? id,
+    String? id,
     String? brand,
     String? articleCode,
     String? articleName,
