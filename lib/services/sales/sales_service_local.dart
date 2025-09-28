@@ -64,35 +64,34 @@ class SaleServiceLocal {
   }
 
   Future<String> addSalesToDbService({
-    required String brand,
-    required String articleCode,
-    required String? articleName,
-    required String size,
-    required String color,
-    required String productCodeSku,
-    required String quantity,
-    required String purchasePrice,
-    required String suggestedSalePrice,
-    required bool isEdit,
+    required String totalAmount,
+    required String paymentType,
+    required String amountPaid,
+    required String changeReturned,
+    required String createdBy,
+    required bool isSynced,
   }) async {
-    final productId = await stockDb.upsertProduct(
-      brand: _normStr(brand),
-      articleCode: _normUpper(articleCode),
-      articleName: _normStr(articleName),
+    final saleID = await stockDb.addSale(
+      totalAmount: totalAmount,
+      paymentType: paymentType,
+      amountPaid: amountPaid,
+      changeReturned: changeReturned,
+      createdBy: createdBy,
+      isSynced: isSynced,
     );
-
-    await stockDb.upsertVariant(
-      productId: productId,
-      sizeEu: _parseInt('size', size),
-      colorName: _normStr(color),
-      sku: _normUpper(productCodeSku),
-      quantity: _parseInt('quantity', quantity),
-      purchasePrice: _parseDouble('purchasePrice', purchasePrice),
-      salePrice: _parseDouble('suggestedSalePrice', suggestedSalePrice),
-      isEdit: isEdit,
-    );
-
-    return productId;
+    return saleID;
+    // await stockDb.upsertVariant(
+    //   productId: productId,
+    //   sizeEu: _parseInt('size', size),
+    //   colorName: _normStr(color),
+    //   sku: _normUpper(productCodeSku),
+    //   quantity: _parseInt('quantity', quantity),
+    //   purchasePrice: _parseDouble('purchasePrice', purchasePrice),
+    //   salePrice: _parseDouble('suggestedSalePrice', suggestedSalePrice),
+    //   isEdit: isEdit,
+    // );
+    //
+    // return productId;
   }
 
   // ---------------------------

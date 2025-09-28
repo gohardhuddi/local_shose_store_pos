@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_shoes_store_pos/views/sales/payment_sheet.dart';
 
@@ -17,6 +18,19 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  // Keep controllers per variantId
+  final Map<String, TextEditingController> _priceControllers = {};
+
+  @override
+  void dispose() {
+    // Dispose all controllers to prevent memory leaks
+    for (final controller in _priceControllers.values) {
+      controller.dispose();
+    }
+    _priceControllers.clear();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
@@ -48,6 +62,14 @@ class _CartScreenState extends State<CartScreen> {
                         itemBuilder: (BuildContext context, int index) {
                           final item = cartItems[index];
 
+                          // Get or create persistent controller for this item
+                          final controller = _priceControllers.putIfAbsent(
+                            item.variantId, // Use variantId as unique key
+                            () => TextEditingController(
+                              text: item.salePrice.toInt().toString(),
+                            ),
+                          );
+
                           return Card(
                             child: Padding(
                               padding: const EdgeInsets.all(8.0),
@@ -62,15 +84,18 @@ class _CartScreenState extends State<CartScreen> {
                                       Row(
                                         children: [
                                           Text("SKU : ", style: headingStyle()),
-                                          Text(
-                                            item.sku ?? "",
-                                            style: headingStyle(),
-                                          ),
+                                          Text(item.sku, style: headingStyle()),
                                         ],
                                       ),
                                       IconButton(
                                         onPressed: () {
-                                          // TODO: dispatch bloc event to remove item
+                                          // Dispose controller when removing item
+                                          _priceControllers[item.variantId]
+                                              ?.dispose();
+                                          _priceControllers.remove(
+                                            item.variantId,
+                                          );
+
                                           context.read<SalesBloc>().add(
                                             RemoveVariantFromCart(
                                               variant: state.cartItems[index],
@@ -89,10 +114,7 @@ class _CartScreenState extends State<CartScreen> {
                                         "In Stock : ",
                                         style: headingStyle(),
                                       ),
-                                      Text(
-                                        "${item.qty ?? 0}",
-                                        style: bodyStyle(),
-                                      ),
+                                      Text("${item.qty}", style: bodyStyle()),
                                     ],
                                   ),
 
@@ -106,12 +128,9 @@ class _CartScreenState extends State<CartScreen> {
                                       IconButton(
                                         onPressed: () {
                                           setState(() {
-                                            if ((item.qtyCart ?? 0) <
-                                                (item.qty ?? 0)) {
-                                              item.qtyCart =
-                                                  (item.qtyCart ?? 0) + 1;
+                                            if (item.qtyCart < item.qty) {
+                                              item.qtyCart += 1;
                                             } else {
-                                              // Optional: show a warning (e.g. snackbar)
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
@@ -127,14 +146,14 @@ class _CartScreenState extends State<CartScreen> {
                                         icon: const Icon(Icons.add),
                                       ),
                                       Text(
-                                        "${item.qtyCart ?? 1}",
+                                        "${item.qtyCart}",
                                         style: bodyStyle(),
                                       ),
                                       IconButton(
                                         onPressed: () {
                                           setState(() {
-                                            if ((item.qtyCart ?? 1) > 1) {
-                                              item.qtyCart = item.qtyCart! - 1;
+                                            if (item.qtyCart > 1) {
+                                              item.qtyCart -= 1;
                                             }
                                           });
                                         },
@@ -157,15 +176,17 @@ class _CartScreenState extends State<CartScreen> {
                                         width: 130,
                                         child: TextField(
                                           keyboardType: TextInputType.number,
-                                          controller: TextEditingController(
-                                            text:
-                                                item.salePrice?.toString() ??
-                                                "0",
-                                          ),
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly, // ✅ Allows only whole numbers
+                                          ],
+                                          controller: controller,
                                           onChanged: (val) {
                                             setState(() {
-                                              item.salePrice =
-                                                  double.tryParse(val) ?? 0.0;
+                                              // ✅ Parse as int, then convert to double for storage
+                                              item.salePrice = double.parse(
+                                                val.isEmpty ? "0" : val,
+                                              );
                                             });
                                           },
                                           decoration: const InputDecoration(
@@ -240,6 +261,7 @@ class _CartScreenState extends State<CartScreen> {
                                           billTotal: double.parse(
                                             _calculateTotalPrice(cartItems),
                                           ),
+                                          cartItems: state.cartItems,
                                         ),
                                       );
                                     }
@@ -285,10 +307,10 @@ class _CartScreenState extends State<CartScreen> {
   String _calculateTotalPrice(List<dynamic> items) {
     double total = 0.0;
     for (var item in items) {
-      final qty = item.qtyCart ?? 1;
-      final price = item.salePrice ?? 0.0;
+      final qty = item.qtyCart;
+      final price = item.salePrice;
       total += qty * price;
     }
-    return total.toStringAsFixed(2);
+    return total.toStringAsFixed(0);
   }
 }

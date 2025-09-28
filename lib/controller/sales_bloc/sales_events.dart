@@ -90,7 +90,31 @@ class RemoveVariantFromCart extends SalesEvents {
 
 class SoldEvent extends SalesEvents {
   final List<VariantModel> cartItems;
-  SoldEvent({required this.cartItems});
+  final String totalAmount;
+  final String paymentType;
+  final String amountPaid;
+  final String changeReturned;
+  final String createdBy;
+  final bool isSynced;
+
+  SoldEvent({
+    required this.cartItems,
+    required this.totalAmount,
+    required this.amountPaid,
+    required this.changeReturned,
+    required this.paymentType,
+    required this.createdBy,
+    required this.isSynced,
+  });
+
   @override
-  List<Object> get props => [cartItems];
+  List<Object> get props => [
+    cartItems,
+    totalAmount,
+    amountPaid,
+    changeReturned,
+    paymentType,
+    createdBy,
+    isSynced,
+  ];
 }

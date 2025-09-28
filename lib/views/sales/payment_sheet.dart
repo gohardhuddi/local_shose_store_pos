@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:local_shoes_store_pos/controller/sales_bloc/sales_events.dart';
+
+import '../../controller/sales_bloc/sales_bloc.dart';
+import '../../models/stock_model.dart';
 
 class PaymentSheet extends StatefulWidget {
   final double billTotal;
-  const PaymentSheet({super.key, required this.billTotal});
+  final List<VariantModel> cartItems;
+  const PaymentSheet({
+    super.key,
+    required this.billTotal,
+    required this.cartItems,
+  });
 
   @override
   State<PaymentSheet> createState() => _PaymentSheetState();
@@ -113,6 +123,17 @@ class _PaymentSheetState extends State<PaymentSheet> {
                 padding: const EdgeInsets.all(16),
               ),
               onPressed: () {
+                context.read<SalesBloc>().add(
+                  SoldEvent(
+                    cartItems: widget.cartItems,
+                    totalAmount: widget.billTotal.toString(),
+                    amountPaid: entered,
+                    changeReturned: _change.toString(),
+                    paymentType: "Cash",
+                    createdBy: "manager",
+                    isSynced: false,
+                  ),
+                );
                 Navigator.pop(context);
                 Navigator.pop(context);
               },

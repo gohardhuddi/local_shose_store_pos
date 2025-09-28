@@ -690,4 +690,17 @@ class StockDbWeb implements StockDb {
       }
     });
   }
+
+  @override
+  Future<String> addSale({
+    required String totalAmount,
+    required String paymentType,
+    required String amountPaid,
+    required String changeReturned,
+    required String createdBy,
+    required bool isSynced,
+  }) {
+    // TODO: implement addSale
+    throw UnimplementedError();
+  }
 }

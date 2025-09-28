@@ -99,4 +99,14 @@ abstract class StockDb {
 
   /// Delete a variant by id; soft by default
   Future<bool> deleteVariantById(String variantId, {bool hard = false});
+
+  ///now moving towards sales
+  Future<String> addSale({
+    required String totalAmount,
+    required String paymentType,
+    required String amountPaid,
+    required String changeReturned,
+    required String createdBy,
+    required bool isSynced,
+  });
 }

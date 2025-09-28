@@ -8,6 +8,7 @@ import 'mobile/app_database.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
 import 'mobile/entities/products.dart';
+import 'mobile/entities/sale.dart';
 import 'stock_db.dart';
 
 class StockDbFloor implements StockDb {
@@ -551,5 +552,33 @@ class StockDbFloor implements StockDb {
     final isActive = activeCount > 0 ? 1 : 0;
 
     await db.productDao.setActive(pid, isActive, now);
+  }
+
+  @override
+  Future<String> addSale({
+    required String totalAmount,
+    required String paymentType,
+    required String amountPaid,
+    required String changeReturned,
+    required String createdBy,
+    required bool isSynced,
+  }) async {
+    final saleID = const Uuid().v4();
+    final now = DateTime.now().toIso8601String();
+    final sale = Sale(
+      saleId: saleID,
+      totalAmount: double.parse(totalAmount),
+      discountAmount: 0.0,
+      finalAmount: 0.0,
+      paymentType: paymentType,
+      amountPaid: double.parse(amountPaid),
+      changeReturned: double.parse(changeReturned),
+      createdBy: createdBy,
+      isSynced: isSynced ? 1 : 0,
+      dateTime: now,
+    );
+
+    await db.saleDao.insertSale(sale);
+    return saleID;
   }
 }

@@ -4,7 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_bloc.dart';
 import 'package:local_shoes_store_pos/controller/connectivity_controller/connectivity_events.dart';
 import 'package:local_shoes_store_pos/repository/add_stock_repository.dart';
+import 'package:local_shoes_store_pos/repository/sales_repository.dart';
 import 'package:local_shoes_store_pos/services/networking/network_service.dart';
+import 'package:local_shoes_store_pos/services/sales/sales_service_local.dart';
+import 'package:local_shoes_store_pos/services/sales/sales_service_remote.dart';
 import 'package:local_shoes_store_pos/services/stock/add_stock_service_local.dart';
 import 'package:local_shoes_store_pos/services/stock/add_stock_service_remote.dart';
 import 'package:local_shoes_store_pos/views/theme_bloc/theme_bloc.dart';
@@ -39,11 +42,21 @@ class MyApp extends StatelessWidget {
       overlays: [SystemUiOverlay.bottom, SystemUiOverlay.top],
     );
 
-    return RepositoryProvider(
-      create: (context) => AddStockRepository(
-        StockServiceLocal(),
-        AddStockServiceRemote(networkService: NetworkService()),
-      ),
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<AddStockRepository>(
+          create: (context) => AddStockRepository(
+            StockServiceLocal(),
+            AddStockServiceRemote(networkService: NetworkService()),
+          ),
+        ),
+        RepositoryProvider<SalesRepository>(
+          create: (context) => SalesRepository(
+            SalesServiceRemote(networkService: NetworkService()),
+            SaleServiceLocal(),
+          ),
+        ),
+      ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider<ThemeBloc>(create: (context) => ThemeBloc()),
@@ -52,16 +65,14 @@ class MyApp extends StatelessWidget {
                 AddStockBloc(context.read<AddStockRepository>()),
           ),
           BlocProvider<SalesBloc>(
-            create: (context) => SalesBloc(context.read<AddStockRepository>()),
+            create: (context) => SalesBloc(context.read<SalesRepository>()),
           ),
           BlocProvider<ConnectivityBloc>(
             create: (context) =>
                 ConnectivityBloc(NetworkService())
                   ..add(CheckInternetConnectivityEvent()),
           ),
-          // Add more BlocProviders here when needed
         ],
-
         child: BlocBuilder<ThemeBloc, ThemeMode>(
           builder: (BuildContext context, state) {
             return MaterialApp(
@@ -75,9 +86,6 @@ class MyApp extends StatelessWidget {
               builder: (context, child) => ConnectivitySnackListener(
                 child: child ?? const SizedBox.shrink(),
               ),
-              // builder: (context, child) => ConnectivityOverlayBanner(
-              //   child: child ?? const SizedBox.shrink(),
-              // ),
             );
           },
         ),
