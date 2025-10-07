@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:sembast_web/sembast_web.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../models/stock_model.dart';
 import 'stock_db.dart';
 
 class StockDbWeb implements StockDb {
@@ -85,12 +86,12 @@ class StockDbWeb implements StockDb {
 
     // Convert camelCase to snake_case
     // purchaseIn -> purchase_in
-    var raw_modified = raw.replaceAllMapped(
+    var rawModified = raw.replaceAllMapped(
       RegExp(r'([a-z])([A-Z])'),
       (m) => '${m[1]}_${m[2]}'.toLowerCase(),
     );
 
-    if (kAllowedActions.contains(raw_modified)) {
+    if (kAllowedActions.contains(rawModified)) {
       return raw;
     }
 
@@ -154,6 +155,7 @@ class StockDbWeb implements StockDb {
   }
 
   /// Convenience: strictly increase quantity (movement = add)
+  @override
   Future<String> addStock({
     required String movementId,
     required String productVariantId,
@@ -172,6 +174,7 @@ class StockDbWeb implements StockDb {
   }
 
   /// Convenience: strictly decrease quantity (movement = subtract)
+  @override
   Future<String> subtractStock({
     required String movementId,
     required String productVariantId,
@@ -190,6 +193,7 @@ class StockDbWeb implements StockDb {
   }
 
   /// Get movements not yet synced upstream
+  @override
   Future<List<Map<String, dynamic>>> getUnsyncedMovements() async {
     final records = await _movements.find(
       _db,
@@ -201,6 +205,7 @@ class StockDbWeb implements StockDb {
   }
 
   /// Mark a movement synced via its movement_id
+  @override
   Future<void> markMovementSynced(String movementId) async {
     final record = await _movements.findFirst(
       _db,
@@ -363,6 +368,7 @@ class StockDbWeb implements StockDb {
   // -------------------------
   /// Edit metadata (size/color/sku/prices) and/or set quantity to an exact value.
   /// If quantity changes, a movement is recorded with the delta.
+  @override
   Future<void> editStock({
     required String productVariantId,
     String? productId, // if you allow moving variants across products

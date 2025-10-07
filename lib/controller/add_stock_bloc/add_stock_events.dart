@@ -45,12 +45,7 @@ class AddStockToDB extends AddStockEvents {
   ];
 }
 
-class GetStockFromDB extends AddStockEvents {
-  GetStockFromDB();
-
-  @override
-  List<Object> get props => [];
-}
+class GetStockFromDB extends AddStockEvents {}
 
 class GetUnSyncedStockFromDB extends AddStockEvents {
   GetUnSyncedStockFromDB();

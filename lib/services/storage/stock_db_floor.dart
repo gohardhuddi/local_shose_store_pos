@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../models/stock_model.dart';
 import 'mobile/app_database.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
@@ -177,12 +178,12 @@ class StockDbFloor implements StockDb {
 
     // Convert camelCase to snake_case
     // purchaseIn -> purchase_in
-    var raw_modified = raw.replaceAllMapped(
+    var rawModified = raw.replaceAllMapped(
       RegExp(r'([a-z])([A-Z])'),
       (m) => '${m[1]}_${m[2]}'.toLowerCase(),
     );
 
-    if (kAllowedActions.contains(raw_modified)) {
+    if (kAllowedActions.contains(rawModified)) {
       return raw;
     }
 
@@ -221,7 +222,7 @@ class StockDbFloor implements StockDb {
       throw StateError('Variant not found by SKU: $productVariantId');
     }
     // assuming your ProductVariant PK is product_variant_id
-    final resolvedVariantId = bySku.first.sku!;
+    final resolvedVariantId = bySku.first.sku;
 
     // 3) write ONLY to movements
     final movement = InventoryMovement(
@@ -293,7 +294,6 @@ class StockDbFloor implements StockDb {
     final when = dateTimeIso ?? now;
 
     final vid = productVariantId;
-    if (vid == null) throw ArgumentError('Invalid productVariantId');
 
     final variants = await db.variantDao.findByVariantId(vid);
     if (variants.isEmpty) {
@@ -309,13 +309,13 @@ class StockDbFloor implements StockDb {
         throw ArgumentError.value(newQuantity, 'newQuantity', 'Must be >= 0');
       }
       delta = newQuantity - currentQty;
-      if (currentQty + delta! < 0) {
+      if (currentQty + delta < 0) {
         throw StateError('Resulting quantity would be negative');
       }
     }
 
     final updatedVariant = variant.copyWith(
-      productId: productId != null ? productId : variant.productId,
+      productId: productId ?? variant.productId,
       sizeEu: sizeEu ?? variant.sizeEu,
       colorName: colorName ?? variant.colorName,
       colorHex: colorHex ?? variant.colorHex,
@@ -528,7 +528,6 @@ class StockDbFloor implements StockDb {
   @override
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) async {
     final key = variantId;
-    if (key == null) return false;
 
     if (hard) {
       await db.variantDao.deleteById(key);
@@ -545,7 +544,6 @@ class StockDbFloor implements StockDb {
   // -------------------------
   Future<void> _recomputeProductActive(String productIdStr) async {
     final pid = productIdStr;
-    if (pid == null) return;
 
     final activeCount = await db.variantDao.countActiveByProductId(pid) ?? 0;
     final now = DateTime.now().toIso8601String();

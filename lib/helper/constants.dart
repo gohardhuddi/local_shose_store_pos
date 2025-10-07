@@ -17,7 +17,9 @@ class CustomImagesPaths {
 
 class CustomStrings {
   static const shopName = "Anarkali Shoes";
-  static const saleScreenHeading = "Anarkali Shoes Sales";
+  static const totalQuantity = "Total Stock Quantity";
+  static const totalPrice = "Total Stock Value Price";
+  static const saleScreenHeading = "Anarkali Shoes POS";
   static const cartScreenHeading = "Anarkali Shoes Cart";
   static const inventoryManagementSystem = "Inventory Management System";
 
@@ -26,6 +28,7 @@ class CustomStrings {
   static const stock = "Stock";
   static const returnText = "Return";
   static const more = "More";
+  static const settings = "Settings";
   static const homePage = "Home Page";
   static const profilePage = "Profile Page";
 
