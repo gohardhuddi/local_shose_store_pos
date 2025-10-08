@@ -7,10 +7,10 @@
 
 import 'dart:convert';
 
+import 'package:local_shoes_store_pos/services/storage/mobile/entities/sale_line.dart';
 import 'package:sembast_web/sembast_web.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../models/stock_model.dart';
 import 'stock_db.dart';
 
 class StockDbWeb implements StockDb {
@@ -707,6 +707,12 @@ class StockDbWeb implements StockDb {
     required bool isSynced,
   }) {
     // TODO: implement addSale
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<String> insertSaleLine({required SaleLine saleLine}) {
+    // TODO: implement insertSaleLine
     throw UnimplementedError();
   }
 }

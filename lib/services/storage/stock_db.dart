@@ -1,3 +1,5 @@
+import 'mobile/entities/sale_line.dart';
+
 abstract class StockDb {
   Future<void> init();
 
@@ -109,4 +111,6 @@ abstract class StockDb {
     required String createdBy,
     required bool isSynced,
   });
+
+  Future<String> insertSaleLine({required SaleLine saleLine});
 }

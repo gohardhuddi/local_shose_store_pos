@@ -4,16 +4,17 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../models/stock_model.dart';
 import 'mobile/app_database.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
 import 'mobile/entities/products.dart';
 import 'mobile/entities/sale.dart';
+import 'mobile/entities/sale_line.dart';
 import 'stock_db.dart';
 
 class StockDbFloor implements StockDb {
   AppDatabase? _db;
+
   AppDatabase get db => _db!;
 
   @override
@@ -21,6 +22,7 @@ class StockDbFloor implements StockDb {
     final dir = await getApplicationDocumentsDirectory();
     final path = join(dir.path, 'shoe_pos_floor.db');
     _db = await openMobileDb(path);
+    print("shoe_pos_floor.db path ====== $path");
   }
 
   // -------------------------
@@ -574,9 +576,29 @@ class StockDbFloor implements StockDb {
       createdBy: createdBy,
       isSynced: isSynced ? 1 : 0,
       dateTime: now,
+      createdAt: now,
+      updatedAt: now,
     );
 
     await db.saleDao.insertSale(sale);
     return saleID;
+  }
+
+  @override
+  Future<String> insertSaleLine({required SaleLine saleLine}) async {
+    final now = DateTime.now().toIso8601String();
+    final saleLineObj = SaleLine(
+      saleLineId: saleLine.saleLineId,
+      variantId: saleLine.variantId,
+      qty: saleLine.qty,
+      unitPrice: saleLine.unitPrice,
+      lineTotal: saleLine.lineTotal,
+      saleId: saleLine.saleId,
+      createdAt: now,
+      isSynced: 0,
+    );
+
+    await db.saleLineDao.insertSaleLine(saleLineObj);
+    return saleLine.saleLineId;
   }
 }

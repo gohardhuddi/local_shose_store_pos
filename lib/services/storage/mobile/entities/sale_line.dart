@@ -31,16 +31,29 @@ class SaleLine {
   @ColumnInfo(name: 'sale_id')
   final String saleId;
 
+  // ✅ Changed from int → String
   @ColumnInfo(name: 'variant_id')
-  final int variantId;
+  final String variantId;
 
   final int qty;
 
+  // ✅ This is your *sale price per unit*, not purchase price
   @ColumnInfo(name: 'unit_price')
   final double unitPrice;
 
   @ColumnInfo(name: 'line_total')
   final double lineTotal;
+
+  // ✅ Added audit fields
+  @ColumnInfo(name: 'created_at')
+  final String createdAt;
+
+  @ColumnInfo(name: 'updated_at')
+  final String? updatedAt;
+
+  // ✅ Sync flag (0 = not synced, 1 = synced)
+  @ColumnInfo(name: 'is_synced')
+  final int isSynced;
 
   const SaleLine({
     required this.saleLineId,
@@ -49,15 +62,21 @@ class SaleLine {
     required this.qty,
     required this.unitPrice,
     required this.lineTotal,
+    required this.createdAt,
+    this.updatedAt,
+    required this.isSynced,
   });
 
   SaleLine copyWith({
     String? saleLineId,
     String? saleId,
-    int? variantId,
+    String? variantId,
     int? qty,
     double? unitPrice,
     double? lineTotal,
+    String? createdAt,
+    String? updatedAt,
+    int? isSynced,
   }) {
     return SaleLine(
       saleLineId: saleLineId ?? this.saleLineId,
@@ -66,6 +85,9 @@ class SaleLine {
       qty: qty ?? this.qty,
       unitPrice: unitPrice ?? this.unitPrice,
       lineTotal: lineTotal ?? this.lineTotal,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isSynced: isSynced ?? this.isSynced,
     );
   }
 }

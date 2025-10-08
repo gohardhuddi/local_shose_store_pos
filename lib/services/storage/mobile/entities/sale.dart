@@ -39,6 +39,14 @@ class Sale {
   @ColumnInfo(name: 'created_by')
   final String createdBy;
 
+  // ✅ New audit fields
+  @ColumnInfo(name: 'created_at')
+  final String createdAt;
+
+  @ColumnInfo(name: 'updated_at')
+  final String? updatedAt;
+
+  // ✅ Sync flag (0 = not synced, 1 = synced)
   @ColumnInfo(name: 'is_synced')
   final int isSynced;
 
@@ -53,6 +61,8 @@ class Sale {
     required this.amountPaid,
     required this.changeReturned,
     required this.createdBy,
+    required this.createdAt,
+    this.updatedAt,
     required this.isSynced,
   });
 
@@ -67,6 +77,8 @@ class Sale {
     double? amountPaid,
     double? changeReturned,
     String? createdBy,
+    String? createdAt,
+    String? updatedAt,
     int? isSynced,
   }) {
     return Sale(
@@ -80,6 +92,8 @@ class Sale {
       amountPaid: amountPaid ?? this.amountPaid,
       changeReturned: changeReturned ?? this.changeReturned,
       createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       isSynced: isSynced ?? this.isSynced,
     );
   }

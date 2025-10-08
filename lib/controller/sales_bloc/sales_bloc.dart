@@ -38,6 +38,7 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
   Future<void> _onSoldEvent(SoldEvent event, Emitter<SalesStates> emit) async {
     emit(SalesLoadingState());
     await _salesRepository.addSalesToDB(
+      cartItems: event.cartItems,
       totalAmount: event.totalAmount,
       paymentType: event.paymentType,
       amountPaid: event.amountPaid,

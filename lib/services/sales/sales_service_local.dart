@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_events.dart';
+import 'package:uuid/uuid.dart';
 
-import '../../main.dart'; // expects a global `stockDb` that implements the extended StockDb interface
+import '../../main.dart';
+import '../../models/stock_model.dart';
+import '../storage/mobile/entities/sale_line.dart'; // expects a global `stockDb` that implements the extended StockDb interface
 
 class SaleServiceLocal {
   // ---------------------------
@@ -64,6 +67,7 @@ class SaleServiceLocal {
   }
 
   Future<String> addSalesToDbService({
+    required List<VariantModel> cartItems,
     required String totalAmount,
     required String paymentType,
     required String amountPaid,
@@ -79,6 +83,21 @@ class SaleServiceLocal {
       createdBy: createdBy,
       isSynced: isSynced,
     );
+    for (final item in cartItems) {
+      final saleLineID = const Uuid().v4();
+      final saleLine = SaleLine(
+        saleLineId: saleLineID,
+        saleId: saleID,
+        variantId: item.variantId,
+        qty: item.qty,
+        unitPrice: item.salePrice,
+        lineTotal: item.qty * item.salePrice,
+        createdAt: '',
+        isSynced: 0,
+      );
+
+      await stockDb.insertSaleLine(saleLine: saleLine);
+    }
     return saleID;
     // await stockDb.upsertVariant(
     //   productId: productId,
