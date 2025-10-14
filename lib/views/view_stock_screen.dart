@@ -103,7 +103,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                           product.variants.fold<double>(
                             0.0,
                             (vSum, variant) =>
-                                vSum + (variant.salePrice * variant.qty),
+                                vSum + (variant.purchasePrice * variant.qty),
                           ),
                     );
 
@@ -154,11 +154,9 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                       if (_filteredStock.isEmpty) {
                         return _buildEmptyState();
                       }
-                      return Expanded(
-                        child: isWide
-                            ? _buildGridView(context, _filteredStock)
-                            : _buildListView(context, _filteredStock),
-                      );
+                      return isWide
+                          ? _buildGridView(context, _filteredStock)
+                          : _buildListView(context, _filteredStock);
                     }
                     return _buildEmptyState();
                   },

@@ -1,47 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_bloc.dart';
-import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_events.dart';
 import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_states.dart';
 import 'package:local_shoes_store_pos/controller/sales_bloc/sales_bloc.dart';
 import 'package:local_shoes_store_pos/controller/sales_bloc/sales_events.dart';
 import 'package:local_shoes_store_pos/controller/sales_bloc/sales_states.dart';
 import 'package:local_shoes_store_pos/helper/constants.dart';
+import 'package:local_shoes_store_pos/models/cart_model.dart';
 import 'package:local_shoes_store_pos/models/stock_model.dart';
 import 'package:local_shoes_store_pos/views/view_helpers/search_helper.dart';
+import 'package:lottie/lottie.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
+import '../../controller/add_stock_bloc/add_stock_events.dart';
 import 'cart_screen.dart';
 
 class POSHomeScreen extends StatefulWidget {
   const POSHomeScreen({super.key, this.onOpenDetails});
+
   final void Function(String sku)? onOpenDetails;
 
   @override
   State<POSHomeScreen> createState() => _POSHomeScreenState();
 }
 
-class _POSHomeScreenState extends State<POSHomeScreen> {
+class _POSHomeScreenState extends State<POSHomeScreen>
+    with SingleTickerProviderStateMixin {
   List<StockModel> _allStock = [];
   List<StockModel> _filteredStock = [];
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _controller = AnimationController(vsync: this);
+
+    // _load();
+    _getSales();
   }
 
   void _load() {
     context.read<AddStockBloc>().add(GetStockFromDB());
   }
 
+  void _getSales() {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    context.read<SalesBloc>().add(
+      GetSalesSummaryEvent(startDate: today, endDate: today),
+    );
+  }
+
   void _onSearchChanged(String query) {
     setState(() {
       _searchQuery = query.trim();
-      _filteredStock = SearchHelper.filterStock(_allStock, query);
     });
+
+    if (_searchQuery.isNotEmpty) {
+      // Load stock if not already loaded
+      if (_allStock.isEmpty) {
+        context.read<AddStockBloc>().add(GetStockFromDB());
+      } else {
+        setState(() {
+          _filteredStock = SearchHelper.filterStock(_allStock, _searchQuery);
+        });
+      }
+    } else {
+      // Clear the list when search is empty
+      setState(() {
+        _filteredStock = [];
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+
+    // TODO: implement dispose
+    super.dispose();
   }
 
   @override
@@ -83,6 +123,20 @@ class _POSHomeScreenState extends State<POSHomeScreen> {
             ),
           );
           _load();
+          _getSales();
+        }
+        if (state is VariantAddToCartFailedState) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                state.error.toString(),
+                style: TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          _load();
+          _getSales();
         }
       },
       child: BlocBuilder<AddStockBloc, AddStockStates>(
@@ -93,14 +147,19 @@ class _POSHomeScreenState extends State<POSHomeScreen> {
 
           if (state is GetStockFromDBSuccessState) {
             _allStock = state.stockList;
-            _filteredStock = _searchQuery.isEmpty
-                ? _allStock
-                : SearchHelper.filterStock(_allStock, _searchQuery);
+            // Only filter when user typed something
+            if (_searchQuery.isNotEmpty) {
+              _filteredStock = SearchHelper.filterStock(
+                _allStock,
+                _searchQuery,
+              );
+            } else {
+              _filteredStock = [];
+            }
 
             if (_filteredStock.isEmpty) {
               return _buildEmptyState();
             }
-
             return RefreshIndicator(
               onRefresh: () async => _load(),
               child: ListView.builder(
@@ -247,7 +306,9 @@ class _POSHomeScreenState extends State<POSHomeScreen> {
               ),
               onTap: () {
                 context.read<SalesBloc>().add(
-                  AddVariantToCart(variant: variant),
+                  AddVariantToCart(
+                    cartItem: CartItemModel(variant: variant, cartQty: 1),
+                  ),
                 );
                 _searchController.clear();
                 _onSearchChanged('');
@@ -264,14 +325,60 @@ class _POSHomeScreenState extends State<POSHomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          BlocBuilder<SalesBloc, SalesStates>(
+            builder: (context, state) {
+              if (state is SalesSummaryLoadedState) {
+                return Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Today\'s Sales',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Total Sales: ${state.summary?.totalSales}'),
+                        Text('Total Orders: ${state.summary?.totalOrders}'),
+                        Text('Items Sold: ${state.summary?.itemsSold}'),
+                      ],
+                    ),
+                  ),
+                );
+              } else {
+                return Text("Data not available yet");
+              }
+            },
+          ),
+
           const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           Text(
             _searchQuery.isNotEmpty
                 ? CustomStrings.noStock
-                : 'No stock found.\nTap the + button to add your first item.',
+                : 'Type something to search for a product...',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+          SizedBox(
+            height: 200,
+            child: Opacity(
+              opacity: 0.5,
+              child: Lottie.asset(
+                'assets/animations/growth.json',
+                controller: _controller,
+                onLoaded: (composition) {
+                  // 👇 Set duration to play slower
+                  _controller.duration = composition.duration * 6; // 2x slower
+                  _controller.repeat(); // Loop continuously
+                },
+              ),
+            ),
           ),
         ],
       ),

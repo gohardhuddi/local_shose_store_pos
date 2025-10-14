@@ -1,4 +1,4 @@
-import 'mobile/entities/sale_line.dart';
+import '../../models/cart_model.dart';
 
 abstract class StockDb {
   Future<void> init();
@@ -103,7 +103,8 @@ abstract class StockDb {
   Future<bool> deleteVariantById(String variantId, {bool hard = false});
 
   ///now moving towards sales
-  Future<String> addSale({
+  Future<String> performSaleTransaction({
+    required List<CartItemModel> cartItems,
     required String totalAmount,
     required String paymentType,
     required String amountPaid,
@@ -112,5 +113,10 @@ abstract class StockDb {
     required bool isSynced,
   });
 
-  Future<String> insertSaleLine({required SaleLine saleLine});
+  ///summery
+  Future<List<Map<String, Object?>>> getSalesSummery({
+    required String startDate,
+    required String endDate,
+  });
+  Future<List<Map<String, Object?>>> getAllSales();
 }

@@ -99,7 +99,6 @@ class VariantModel {
   final String colorName;
   final String? colorHex;
   int qty;
-  int qtyCart = 1;
   final double purchasePrice;
   double salePrice;
   final bool isActive;

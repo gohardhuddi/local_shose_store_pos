@@ -10,7 +10,7 @@ import '../../controller/sales_bloc/sales_bloc.dart';
 import '../../controller/sales_bloc/sales_events.dart';
 import '../../controller/sales_bloc/sales_states.dart';
 import '../../helper/constants.dart';
-import '../../models/stock_model.dart';
+import '../../models/cart_model.dart';
 import '../view_helpers/resueables/custom_button.dart';
 
 class CartBody extends StatefulWidget {
@@ -68,9 +68,9 @@ class _CartBodyState extends State<CartBody> {
                     final item = cartItems[index];
 
                     final controller = _priceControllers.putIfAbsent(
-                      item.variantId,
+                      item.variant.variantId,
                       () => TextEditingController(
-                        text: item.salePrice.toInt().toString(),
+                        text: item.variant.salePrice.toInt().toString(),
                       ),
                     );
 
@@ -101,7 +101,7 @@ class _CartBodyState extends State<CartBody> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  "SKU: ${item.sku}",
+                                  "SKU: ${item.variant.sku}",
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -113,9 +113,11 @@ class _CartBodyState extends State<CartBody> {
                                     color: Colors.redAccent,
                                   ),
                                   onPressed: () {
-                                    _priceControllers[item.variantId]
+                                    _priceControllers[item.variant.variantId]
                                         ?.dispose();
-                                    _priceControllers.remove(item.variantId);
+                                    _priceControllers.remove(
+                                      item.variant.variantId,
+                                    );
                                     context.read<SalesBloc>().add(
                                       RemoveVariantFromCart(variant: item),
                                     );
@@ -126,7 +128,7 @@ class _CartBodyState extends State<CartBody> {
 
                             const SizedBox(height: 8),
                             Text(
-                              "${item.colorName} • Size ${item.size}",
+                              "${item.variant.colorName} • Size ${item.variant.size}",
                               style: const TextStyle(fontSize: 14),
                             ),
 
@@ -144,7 +146,7 @@ class _CartBodyState extends State<CartBody> {
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      "In Stock: ${item.qty}",
+                                      "In Stock: ${item.variant.qty}",
                                       style: const TextStyle(fontSize: 14),
                                     ),
                                   ],
@@ -176,7 +178,7 @@ class _CartBodyState extends State<CartBody> {
                                         ),
                                         onChanged: (val) {
                                           setState(() {
-                                            item.salePrice =
+                                            item.variant.salePrice =
                                                 double.tryParse(val) ?? 0;
                                           });
                                         },
@@ -202,7 +204,9 @@ class _CartBodyState extends State<CartBody> {
                                   color: Colors.redAccent,
                                   onPressed: () {
                                     setState(() {
-                                      if (item.qtyCart > 1) item.qtyCart--;
+                                      if (item.cartQty > 1) {
+                                        item.cartQty--;
+                                      }
                                     });
                                   },
                                 ),
@@ -211,7 +215,7 @@ class _CartBodyState extends State<CartBody> {
                                     horizontal: 10,
                                   ),
                                   child: Text(
-                                    "${item.qtyCart}",
+                                    "${item.cartQty}",
                                     style: const TextStyle(fontSize: 16),
                                   ),
                                 ),
@@ -220,8 +224,8 @@ class _CartBodyState extends State<CartBody> {
                                   color: Colors.green,
                                   onPressed: () {
                                     setState(() {
-                                      if (item.qtyCart < item.qty) {
-                                        item.qtyCart++;
+                                      if (item.cartQty < item.variant.qty) {
+                                        item.cartQty++;
                                       } else {
                                         ScaffoldMessenger.of(
                                           context,
@@ -352,7 +356,7 @@ class _CartBodyState extends State<CartBody> {
     );
   }
 
-  void _showPayment(BuildContext context, List<VariantModel> cartItems) {
+  void _showPayment(BuildContext context, List<CartItemModel> cartItems) {
     final total = double.parse(_calculateTotalPrice(cartItems));
 
     final isMobile =
@@ -387,10 +391,10 @@ class _CartBodyState extends State<CartBody> {
     }
   }
 
-  String _calculateTotalPrice(List<dynamic> items) {
+  String _calculateTotalPrice(List<CartItemModel> items) {
     double total = 0;
     for (var item in items) {
-      total += item.qtyCart * item.salePrice;
+      total += item.cartQty * item.variant.salePrice;
     }
     return total.toStringAsFixed(0);
   }

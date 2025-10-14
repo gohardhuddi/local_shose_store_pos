@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
-import 'package:local_shoes_store_pos/models/stock_model.dart';
+
+import '../../models/cart_model.dart';
 
 enum StockMovementType { purchaseIn, saleOut, returnStock, transfer }
 
@@ -71,16 +72,16 @@ class AddStockMovementEvent extends SalesEvents {
 }
 
 class AddVariantToCart extends SalesEvents {
-  final VariantModel variant;
+  final CartItemModel cartItem;
 
-  AddVariantToCart({required this.variant});
+  AddVariantToCart({required this.cartItem});
 
   @override
-  List<Object> get props => [variant];
+  List<Object> get props => [cartItem];
 }
 
 class RemoveVariantFromCart extends SalesEvents {
-  final VariantModel variant;
+  final CartItemModel variant;
 
   RemoveVariantFromCart({required this.variant});
 
@@ -89,7 +90,7 @@ class RemoveVariantFromCart extends SalesEvents {
 }
 
 class SoldEvent extends SalesEvents {
-  final List<VariantModel> cartItems;
+  final List<CartItemModel> cartItems;
   final String totalAmount;
   final String paymentType;
   final String amountPaid;
@@ -118,3 +119,12 @@ class SoldEvent extends SalesEvents {
     isSynced,
   ];
 }
+
+class GetSalesSummaryEvent extends SalesEvents {
+  final String startDate;
+  final String endDate;
+
+  GetSalesSummaryEvent({required this.startDate, required this.endDate});
+}
+
+class GetAllSalesEvent extends SalesEvents {}

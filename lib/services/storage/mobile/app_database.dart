@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:floor/floor.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
+import '../../../models/dto/sales_summery_query.dart';
 import 'daos/movement_dao.dart';
 import 'daos/product_dao.dart';
 import 'daos/sale_dao.dart';

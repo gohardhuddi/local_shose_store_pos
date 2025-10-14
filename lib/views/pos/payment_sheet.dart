@@ -6,11 +6,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_shoes_store_pos/controller/sales_bloc/sales_events.dart';
 
 import '../../controller/sales_bloc/sales_bloc.dart';
-import '../../models/stock_model.dart';
+import '../../models/cart_model.dart';
 
 class PaymentSheet extends StatefulWidget {
   final double billTotal;
-  final List<VariantModel> cartItems;
+  final List<CartItemModel> cartItems;
 
   const PaymentSheet({
     super.key,

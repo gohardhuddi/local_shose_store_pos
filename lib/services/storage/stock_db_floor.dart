@@ -1,16 +1,18 @@
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart';
+import 'package:local_shoes_store_pos/services/storage/stock_db.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../models/cart_model.dart';
 import 'mobile/app_database.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
 import 'mobile/entities/products.dart';
 import 'mobile/entities/sale.dart';
 import 'mobile/entities/sale_line.dart';
-import 'stock_db.dart';
 
 class StockDbFloor implements StockDb {
   AppDatabase? _db;
@@ -22,7 +24,6 @@ class StockDbFloor implements StockDb {
     final dir = await getApplicationDocumentsDirectory();
     final path = join(dir.path, 'shoe_pos_floor.db');
     _db = await openMobileDb(path);
-    print("shoe_pos_floor.db path ====== $path");
   }
 
   // -------------------------
@@ -310,7 +311,7 @@ class StockDbFloor implements StockDb {
       if (newQuantity < 0) {
         throw ArgumentError.value(newQuantity, 'newQuantity', 'Must be >= 0');
       }
-      delta = newQuantity - currentQty;
+      delta = (newQuantity - currentQty).toInt();
       if (currentQty + delta < 0) {
         throw StateError('Resulting quantity would be negative');
       }
@@ -555,7 +556,11 @@ class StockDbFloor implements StockDb {
   }
 
   @override
-  Future<String> addSale({
+  // -------------------------------------------------
+  // SALE TRANSACTION: add Sale + SaleLines + Stock updates
+  // -------------------------------------------------
+  Future<String> performSaleTransaction({
+    required List<CartItemModel> cartItems,
     required String totalAmount,
     required String paymentType,
     required String amountPaid,
@@ -563,42 +568,159 @@ class StockDbFloor implements StockDb {
     required String createdBy,
     required bool isSynced,
   }) async {
-    final saleID = const Uuid().v4();
     final now = DateTime.now().toIso8601String();
-    final sale = Sale(
-      saleId: saleID,
-      totalAmount: double.parse(totalAmount),
-      discountAmount: 0.0,
-      finalAmount: 0.0,
-      paymentType: paymentType,
-      amountPaid: double.parse(amountPaid),
-      changeReturned: double.parse(changeReturned),
-      createdBy: createdBy,
-      isSynced: isSynced ? 1 : 0,
-      dateTime: now,
-      createdAt: now,
-      updatedAt: now,
-    );
+    final saleId = const Uuid().v4();
 
-    await db.saleDao.insertSale(sale);
-    return saleID;
+    try {
+      // Step 1 — Insert Sale
+      final sale = Sale(
+        saleId: saleId,
+        totalAmount: double.parse(totalAmount),
+        discountAmount: 0.0,
+        finalAmount: double.parse(totalAmount),
+        paymentType: paymentType,
+        amountPaid: double.parse(amountPaid),
+        changeReturned: double.parse(changeReturned),
+        createdBy: createdBy,
+        isSynced: isSynced ? 1 : 0,
+        dateTime: now,
+        createdAt: now,
+      );
+      await db.saleDao.insertSale(sale);
+
+      // Step 2 — Process Each Cart Item
+      for (final item in cartItems) {
+        final saleLineId = const Uuid().v4();
+
+        final saleLine = SaleLine(
+          saleLineId: saleLineId,
+          saleId: saleId,
+          variantId: item.variant.variantId,
+          qty: item.cartQty,
+          unitPrice: item.variant.salePrice,
+          lineTotal: item.cartQty * item.variant.salePrice,
+          createdAt: now,
+          isSynced: isSynced ? 1 : 0,
+        );
+
+        await db.saleLineDao.insertSaleLine(saleLine);
+
+        // Update stock quantity
+        final variants = await db.variantDao.findByVariantId(
+          item.variant.variantId,
+        );
+        if (variants.isEmpty) {
+          throw StateError('Variant not found: ${item.variant.variantId}');
+        }
+
+        final variant = variants.first;
+        final newQty = variant.quantity - item.cartQty;
+        if (newQty < 0) {
+          throw StateError(
+            'Insufficient stock for SKU ${variant.sku} — '
+            'current ${variant.quantity}, trying to sell ${item.cartQty}',
+          );
+        }
+
+        final updatedVariant = variant.copyWith(
+          quantity: newQty,
+          updatedAt: now,
+          isSynced: 0,
+        );
+        await db.variantDao.updateVariant(updatedVariant);
+
+        // Log stock movement
+        final movement = InventoryMovement(
+          movementId: const Uuid().v4(),
+          productVariantId: item.variant.variantId,
+          quantity: item.cartQty,
+          action: 'sale_out',
+          dateTime: now,
+          isSynced: isSynced ? 1 : 0,
+        );
+        await db.movementDao.insertMovement(movement);
+      }
+
+      return saleId;
+    } catch (e) {
+      // Optional rollback cleanup if partial data inserted
+      try {
+        await db.saleDao.clearSales();
+        await db.saleLineDao.clearLinesForSale(saleId);
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   @override
-  Future<String> insertSaleLine({required SaleLine saleLine}) async {
-    final now = DateTime.now().toIso8601String();
-    final saleLineObj = SaleLine(
-      saleLineId: saleLine.saleLineId,
-      variantId: saleLine.variantId,
-      qty: saleLine.qty,
-      unitPrice: saleLine.unitPrice,
-      lineTotal: saleLine.lineTotal,
-      saleId: saleLine.saleId,
-      createdAt: now,
-      isSynced: 0,
-    );
+  @override
+  Future<List<Map<String, Object?>>> getSalesSummery({
+    required String startDate,
+    required String endDate,
+  }) async {
+    try {
+      final result = await db.database.rawQuery(
+        '''
+      SELECT 
+        SUM(final_amount * 1.0) AS totalSales,
+        COUNT(sale_id) AS totalOrders,
+        (
+          SELECT SUM(qty)
+          FROM sale_lines
+          WHERE sale_id IN (
+            SELECT sale_id FROM sales
+            WHERE date(date_time) BETWEEN ? AND ?
+          )
+        ) AS itemsSold
+      FROM sales
+      WHERE date(date_time) BETWEEN ? AND ?
+      ''',
+        [startDate, endDate, startDate, endDate],
+      );
+      debugPrint(result.toString());
+      return result;
+    } catch (e, st) {
+      debugPrint('❌ Sales summary query failed: $e');
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    }
+  }
 
-    await db.saleLineDao.insertSaleLine(saleLineObj);
-    return saleLine.saleLineId;
+  @override
+  @override
+  Future<List<Map<String, Object?>>> getAllSales() async {
+    try {
+      final result = await db.database.rawQuery('''
+      SELECT 
+        s.sale_id AS saleId,
+        s.total_amount AS totalAmount,
+        s.final_amount AS finalAmount,
+        s.payment_type AS paymentType,
+        s.amount_paid AS amountPaid,
+        s.change_returned AS changeReturned,
+        s.date_time AS dateTime,
+        json_group_array(
+          json_object(
+            'saleLineId', sl.sale_line_id,
+            'variantId', sl.variant_id,
+            'sku', v.sku,
+            'qty', sl.qty,
+            'unitPrice', sl.unit_price,
+            'lineTotal', sl.line_total
+          )
+        ) AS saleLines
+      FROM sales s
+      LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
+      LEFT JOIN product_variants v ON v.product_variant_id = sl.variant_id
+      GROUP BY s.sale_id
+      ORDER BY s.date_time DESC;
+    ''');
+
+      return result;
+    } catch (e, st) {
+      debugPrint('❌ getAllSales query failed: $e');
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    }
   }
 }

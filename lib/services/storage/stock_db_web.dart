@@ -7,10 +7,10 @@
 
 import 'dart:convert';
 
-import 'package:local_shoes_store_pos/services/storage/mobile/entities/sale_line.dart';
 import 'package:sembast_web/sembast_web.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../models/cart_model.dart';
 import 'stock_db.dart';
 
 class StockDbWeb implements StockDb {
@@ -711,8 +711,31 @@ class StockDbWeb implements StockDb {
   }
 
   @override
-  Future<String> insertSaleLine({required SaleLine saleLine}) {
+  Future<String> performSaleTransaction({
+    required List<CartItemModel> cartItems,
+    required String totalAmount,
+    required String paymentType,
+    required String amountPaid,
+    required String changeReturned,
+    required String createdBy,
+    required bool isSynced,
+  }) {
     // TODO: implement insertSaleLine
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> getSalesSummery({
+    required String startDate,
+    required String endDate,
+  }) {
+    // TODO: implement getSalesSummery
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> getAllSales() {
+    // TODO: implement getAllSales
     throw UnimplementedError();
   }
 }

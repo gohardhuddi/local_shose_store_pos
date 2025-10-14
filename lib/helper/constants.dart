@@ -22,6 +22,7 @@ class CustomStrings {
   static const saleScreenHeading = "Anarkali Shoes POS";
   static const cartScreenHeading = "Anarkali Shoes Cart";
   static const inventoryManagementSystem = "Inventory Management System";
+  static const salesRecord = "Sales Record";
 
   // Navigation
   static const sale = "Sale";

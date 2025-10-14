@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/views/pos/pos_home_screen.dart';
+import 'package:local_shoes_store_pos/views/pos/view_sales.dart';
 import 'package:local_shoes_store_pos/views/view_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
@@ -50,11 +51,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<Widget> get _screens => const [
+  List<Widget> get _screensMobile => const [
     POSHomeScreen(),
     ViewStockScreen(),
     Center(child: Text('Profile Page')),
     MoreScreen(),
+  ];
+  List<Widget> get _screensDesktop => const [
+    POSHomeScreen(),
+    ViewStockScreen(),
+    Center(child: Text('Profile Page')),
+    MoreScreen(),
+    ViewSalesScreen(),
   ];
 
   List<PersistentBottomNavBarItem> _navItems(BuildContext context) {
@@ -104,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: PersistentTabView(
               context,
               controller: _controller,
-              screens: _screens,
+              screens: _screensMobile,
               items: _navItems(context),
               backgroundColor: bgColor,
               handleAndroidBackButtonPress: true,
@@ -151,10 +159,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(CupertinoIcons.settings),
                 label: Text(CustomStrings.settings),
               ),
+              NavigationRailDestination(
+                icon: Icon(CupertinoIcons.table),
+                label: Text(CustomStrings.salesRecord),
+              ),
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
-          Expanded(child: _screens[_selectedIndex]),
+          Expanded(child: _screensDesktop[_selectedIndex]),
         ],
       ),
     );
