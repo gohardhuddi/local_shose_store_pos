@@ -1,0 +1,75 @@
+name: Build Android APK & Create Release
+
+on:
+  push:
+    branches: [ release ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Read version & app name from pubspec.yaml
+        id: vars
+        shell: bash
+        run: |
+          VERSION_LINE=$(grep -E '^version:' pubspec.yaml | head -1)
+          VERSION_NAME=${VERSION_LINE#version: }
+          VERSION_NAME=${VERSION_NAME%%+*}
+          VERSION_CODE=${VERSION_LINE##*+}
+          APP_NAME=$(grep -E '^name:' pubspec.yaml | head -1 | awk '{print $2}')
+
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+
+          # Build a unique tag every run to avoid collisions if version doesn't change
+          echo "tag=v${VERSION_NAME}+${VERSION_CODE}-build-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.app_name }} v${{ steps.vars.outputs.version_name }} (build ${{ steps.vars.outputs.version_code }})
+          body: |
+            Automated release from branch `release`.
+            - Version: ${{ steps.vars.outputs.version_name }}+${{ steps.vars.outputs.version_code }}
+            - Commit: ${{ github.sha }}
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+          draft: false
+          prerelease: false
+
+      # Optional: also save as a CI artifact for quick download from the Actions run
+      - name: Upload APK as workflow artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ steps.vars.outputs.version_name }}+${{ steps.vars.outputs.version_code }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
