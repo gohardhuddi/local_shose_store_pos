@@ -1,13 +1,14 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:local_shoes_store_pos/helper/constants.dart';
-import 'package:local_shoes_store_pos/views/more_screen.dart';
 import 'package:local_shoes_store_pos/views/pos/pos_home_screen.dart';
 import 'package:local_shoes_store_pos/views/pos/view_sales.dart';
 import 'package:local_shoes_store_pos/views/settings_screen.dart';
 import 'package:local_shoes_store_pos/views/view_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+
+import '../helper/constants.dart';
+import 'more_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -79,13 +80,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<Widget> get _screensMobile => const [
+  List<Widget> get _screensMobile => [
     POSHomeScreen(),
     ViewStockScreen(),
     Center(child: Text('Profile Page')),
     MoreScreen(),
   ];
-  List<Widget> get _screensDesktop => const [
+  List<Widget> get _screensDesktop => [
     POSHomeScreen(),
     ViewStockScreen(),
     Center(child: Text('Profile Page')),
