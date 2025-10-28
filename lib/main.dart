@@ -16,6 +16,7 @@ import 'package:local_shoes_store_pos/views/view_helpers/theme.dart';
 
 import 'controller/connectivity_controller/connectivity_bloc.dart';
 import 'controller/sales_bloc/sales_bloc.dart';
+import 'device_info_service.dart';
 import 'helper/global.dart';
 import 'helper/routes.dart';
 import 'services/storage/stock_db.dart';
@@ -28,6 +29,8 @@ Future<void> main() async {
   Global.setup();
   stockDb = StockDbFactory.create();
   await stockDb.init();
+  final info = await DeviceInfoService.getDeviceInfo();
+  debugPrint('Device info: $info');
 
   runApp(const MyApp());
 }

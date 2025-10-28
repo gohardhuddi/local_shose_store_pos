@@ -42,4 +42,7 @@ class SalesErrorState extends SalesStates {
 class GetAllSalesSuccessState extends SalesStates {
   final List<SaleWithLines> sales;
   GetAllSalesSuccessState(this.sales);
+
+  @override
+  List<Object> get props => [sales]; // 👈 ADD THIS
 }

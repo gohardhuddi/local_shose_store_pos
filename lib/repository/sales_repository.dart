@@ -52,4 +52,15 @@ class SalesRepository {
     final rows = await _salesServiceLocal.getAllSalesWithLines();
     return rows.map((row) => SaleWithLines.fromJson(row)).toList();
   }
+
+  Future<List<SaleWithLines>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  }) async {
+    final rows = await _salesServiceLocal.getSalesByDateRange(
+      startDate: startDate,
+      endDate: endDate,
+    );
+    return rows.map((row) => SaleWithLines.fromJson(row)).toList();
+  }
 }

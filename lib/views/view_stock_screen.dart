@@ -107,15 +107,16 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                           ),
                     );
 
-                    return Row(
+                    return Flex(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      direction: Axis.vertical,
                       children: [
                         Text(
                           '${CustomStrings.totalQuantity}: $totalQuantity',
                           style: theme.textTheme.titleMedium,
                         ),
                         Text(
-                          '${CustomStrings.totalPrice}: \$${totalValue.toStringAsFixed(0)}',
+                          '${CustomStrings.totalPrice}: RS ${totalValue.toStringAsFixed(0)}',
                           style: theme.textTheme.titleMedium,
                         ),
                       ],

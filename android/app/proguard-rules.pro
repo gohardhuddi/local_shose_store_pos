@@ -1,0 +1,5 @@
+-keep class com.google.crypto.tink.** { *; }
+-keep class com.google.errorprone.** { *; }
+-keep class javax.annotation.** { *; }
+-dontwarn com.google.errorprone.**
+-dontwarn javax.annotation.**

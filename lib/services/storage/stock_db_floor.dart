@@ -24,6 +24,7 @@ class StockDbFloor implements StockDb {
     final dir = await getApplicationDocumentsDirectory();
     final path = join(dir.path, 'shoe_pos_floor.db');
     _db = await openMobileDb(path);
+    print(path);
   }
 
   // -------------------------
@@ -687,6 +688,37 @@ class StockDbFloor implements StockDb {
   }
 
   @override
+  Future<List<Map<String, Object?>>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  }) async {
+    return await db.database.rawQuery(
+      '''
+    SELECT 
+      s.sale_id AS saleId,
+      s.total_amount AS totalAmount,
+      s.date_time AS dateTime,
+      json_group_array(
+        json_object(
+          'saleLineId', sl.sale_line_id,
+          'variantId', sl.variant_id,
+          'sku', v.sku,
+          'qty', sl.qty,
+          'unitPrice', sl.unit_price,
+          'lineTotal', sl.line_total
+        )
+      ) AS saleLines
+    FROM sales s
+    LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
+    LEFT JOIN product_variants v ON v.product_variant_id = sl.variant_id
+    WHERE date(s.date_time) BETWEEN ? AND ?
+    GROUP BY s.sale_id
+    ORDER BY s.date_time DESC;
+  ''',
+      [startDate, endDate],
+    );
+  }
+
   @override
   Future<List<Map<String, Object?>>> getAllSales() async {
     try {

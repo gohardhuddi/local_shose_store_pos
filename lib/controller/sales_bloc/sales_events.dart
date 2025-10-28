@@ -128,3 +128,21 @@ class GetSalesSummaryEvent extends SalesEvents {
 }
 
 class GetAllSalesEvent extends SalesEvents {}
+
+class GetSalesByDateRangeEvent extends SalesEvents {
+  final String startDate;
+  final String endDate;
+
+  GetSalesByDateRangeEvent({required this.startDate, required this.endDate});
+}
+
+class GetCartItemsEvent extends SalesEvents {}
+
+class SearchSalesEvent extends SalesEvents {
+  final String query;
+
+  SearchSalesEvent(this.query);
+
+  @override
+  List<Object> get props => [query];
+}

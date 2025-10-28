@@ -738,4 +738,13 @@ class StockDbWeb implements StockDb {
     // TODO: implement getAllSales
     throw UnimplementedError();
   }
+
+  @override
+  Future<List<Map<String, Object?>>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  }) {
+    // TODO: implement getSalesByDateRange
+    throw UnimplementedError();
+  }
 }

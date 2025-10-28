@@ -22,6 +22,12 @@ class CartBody extends StatefulWidget {
 
 class _CartBodyState extends State<CartBody> {
   final Map<String, TextEditingController> _priceControllers = {};
+  @override
+  void initState() {
+    // TODO: implement initState
+    context.read<SalesBloc>().add(GetCartItemsEvent());
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -155,11 +161,7 @@ class _CartBodyState extends State<CartBody> {
                                 // Editable Price
                                 Row(
                                   children: [
-                                    const Icon(
-                                      Icons.attach_money,
-                                      size: 18,
-                                      color: Colors.grey,
-                                    ),
+                                    Text("RS"),
                                     SizedBox(
                                       width: 80,
                                       child: TextField(

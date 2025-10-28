@@ -36,8 +36,32 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0"
+            )
+        }
+    }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.errorprone:error_prone_annotations:2.23.0")
+    implementation("org.checkerframework:checker-qual:3.43.0")
+    implementation("javax.annotation:javax.annotation-api:1.3.2")
+    implementation("com.google.http-client:google-http-client:1.43.3")
+    implementation("joda-time:joda-time:2.12.5")
+    implementation("org.joda:joda-convert:2.2.3")
+
 }

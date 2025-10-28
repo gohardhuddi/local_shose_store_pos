@@ -2,12 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:local_shoes_store_pos/helper/constants.dart';
+import 'package:local_shoes_store_pos/views/more_screen.dart';
 import 'package:local_shoes_store_pos/views/pos/pos_home_screen.dart';
 import 'package:local_shoes_store_pos/views/pos/view_sales.dart';
+import 'package:local_shoes_store_pos/views/settings_screen.dart';
 import 'package:local_shoes_store_pos/views/view_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
-
-import 'more_view.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,12 +20,40 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PersistentTabController _controller;
   String _appBarTitle = CustomStrings.saleScreenHeading;
   int _selectedIndex = 0;
+  bool _wasDesktop = false;
 
   @override
   void initState() {
     super.initState();
     _controller = PersistentTabController(initialIndex: 0);
     _controller.addListener(_updateTitle);
+  }
+
+  @override
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final isNowDesktop = _isDesktopLayout;
+
+    // Initialize on first call
+    if (_wasDesktop == false && _selectedIndex == 0) {
+      _wasDesktop = isNowDesktop;
+      return;
+    }
+
+    // Detect layout switch (desktop ↔ mobile)
+    if (_wasDesktop != isNowDesktop) {
+      _wasDesktop = isNowDesktop;
+
+      if (!isNowDesktop && _selectedIndex >= _screensMobile.length) {
+        setState(() {
+          _selectedIndex = 0;
+          _controller.index = 0;
+          _updateTitle();
+        });
+      }
+    }
   }
 
   void _updateTitle() {
@@ -61,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
     POSHomeScreen(),
     ViewStockScreen(),
     Center(child: Text('Profile Page')),
-    MoreScreen(),
+    SettingsScreen(),
     ViewSalesScreen(),
   ];
 
@@ -160,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(CustomStrings.settings),
               ),
               NavigationRailDestination(
-                icon: Icon(CupertinoIcons.table),
+                icon: Icon(Icons.receipt_long),
                 label: Text(CustomStrings.salesRecord),
               ),
             ],

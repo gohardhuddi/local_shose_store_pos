@@ -85,15 +85,18 @@ abstract class StockDb {
 
   /// Movement sync helpers (optional but useful for an offline-first pipeline)
   Future<List<Map<String, dynamic>>> getUnsyncedMovements();
+
   Future<void> markMovementSynced(String movementId);
 
   //get unsynced pro and vari
 
   Future<Map<String, dynamic>> getUnsyncedPayload();
+
   // -------------------------
   // Queries / Reporting
   // -------------------------
   Future<List<Map<String, dynamic>>> getAllProducts();
+
   Future<List<Map<String, dynamic>>> getAllVariants();
 
   /// Stock snapshot with aggregated totals and nested variants (JSON string)
@@ -118,5 +121,11 @@ abstract class StockDb {
     required String startDate,
     required String endDate,
   });
+
   Future<List<Map<String, Object?>>> getAllSales();
+
+  Future<List<Map<String, Object?>>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  });
 }

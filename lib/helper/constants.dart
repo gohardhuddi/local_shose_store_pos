@@ -76,6 +76,9 @@ class CustomStrings {
   static const delete = "Delete";
   static const edit = "Edit";
   static const tapped = "Tapped";
+  static const price = "price";
+  static const lineTotal = "Line Total";
+  static const noSales = "No sales recorded yet.";
 
   // Colors
   static const black = "Black";
@@ -103,6 +106,11 @@ class CustomStrings {
   static const sell = "Sell:";
   static const qtyTotal = "Qty";
   static const variants = "Variants";
+  static const salesHistory = "Sales History";
+  static const searchByDate = "Search by SKU, Amount, or Date (DD-MM-YYY)";
+  static const saleID = "Sale ID:";
+  static const total = "Total:";
+  static const currency = "Rs";
 
   // Success/Error Messages
   static const stockAddedSuccessfully = "Stock Added Successfully";

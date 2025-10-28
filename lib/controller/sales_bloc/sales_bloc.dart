@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:local_shoes_store_pos/repository/sales_repository.dart';
 
 import '../../models/cart_model.dart';
+import '../../models/dto/get_all_sales_with_lines_model.dart';
 import 'sales_events.dart';
 import 'sales_states.dart';
 
@@ -16,9 +18,13 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     on<SoldEvent>(_onSoldEvent);
     on<GetSalesSummaryEvent>(_onGetSalesSummaryEvent);
     on<GetAllSalesEvent>(_onGetAllSalesEvents);
+    on<GetSalesByDateRangeEvent>(_onGetSalesByDateRange);
+    on<GetCartItemsEvent>(_onGetCartItems);
+    on<SearchSalesEvent>(_onSearchSales); // 👈 ADD THIS
   }
 
   List<CartItemModel> cartItems = [];
+  List<SaleWithLines> _allSales = [];
 
   Future<void> _onAddVariantToCart(
     AddVariantToCart event,
@@ -54,6 +60,8 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
       createdBy: event.createdBy,
       isSynced: event.isSynced,
     );
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    add(GetSalesSummaryEvent(startDate: today, endDate: today));
   }
 
   Future<void> _onGetSalesSummaryEvent(
@@ -79,9 +87,97 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     try {
       emit(SalesLoadingState());
       final sales = await _salesRepository.getAllSalesWithLines();
+      _allSales = sales; // store master copy
       emit(GetAllSalesSuccessState(sales));
     } catch (e) {
       emit(SalesErrorState(e.toString()));
     }
+  }
+
+  Future<void> _onGetSalesByDateRange(
+    GetSalesByDateRangeEvent event,
+    Emitter<SalesStates> emit,
+  ) async {
+    try {
+      emit(SalesLoadingState());
+      final sales = await _salesRepository.getSalesByDateRange(
+        startDate: event.startDate,
+        endDate: event.endDate,
+      );
+      _allSales = sales; // also store master copy for search
+      emit(GetAllSalesSuccessState(sales));
+    } catch (e) {
+      emit(SalesErrorState(e.toString()));
+    }
+  }
+
+  // 🔍 NEW SEARCH HANDLER
+  void _onSearchSales(SearchSalesEvent event, Emitter<SalesStates> emit) {
+    final query = event.query.trim().toLowerCase();
+
+    // If query empty → return full list
+    if (query.isEmpty) {
+      emit(GetAllSalesSuccessState(_allSales));
+      return;
+    }
+
+    final filtered = _allSales.where((saleWithLines) {
+      final sale = saleWithLines.sale;
+      final dateStr = sale.dateTime; // e.g., "2025-01-28"
+
+      // --- ✅ DATE FILTERING ---
+      // Parse and format date in multiple formats
+      DateTime? saleDate;
+      try {
+        saleDate = DateTime.parse(dateStr);
+      } catch (_) {
+        saleDate = null;
+      }
+
+      String formattedDate1 = saleDate != null
+          ? DateFormat('dd-MM-yyyy').format(saleDate)
+          : '';
+      String formattedDate2 = saleDate != null
+          ? DateFormat('dd/MM/yyyy').format(saleDate)
+          : '';
+      String formattedDate3 = saleDate != null
+          ? DateFormat('dd MMM yyyy').format(saleDate)
+          : '';
+      String formattedDate4 = saleDate != null
+          ? DateFormat('yyyy-MM-dd').format(saleDate)
+          : '';
+
+      final dateMatch =
+          formattedDate1.toLowerCase().contains(query) ||
+          formattedDate2.toLowerCase().contains(query) ||
+          formattedDate3.toLowerCase().contains(query) ||
+          formattedDate4.toLowerCase().contains(query) ||
+          saleDate?.month.toString().padLeft(2, '0').contains(query) == true ||
+          saleDate?.year.toString().contains(query) == true ||
+          DateFormat(
+            'MMM',
+          ).format(saleDate ?? DateTime(2000)).toLowerCase().contains(query);
+
+      // --- 💰 AMOUNT MATCH (partial number or text) ---
+      final amountMatch = sale.totalAmount.toString().toLowerCase().contains(
+        query,
+      );
+
+      // --- 📦 SKU MATCH (any line item) ---
+      final skuMatch = saleWithLines.lines.any(
+        (line) => line.sku.toLowerCase().contains(query),
+      );
+
+      return dateMatch || amountMatch || skuMatch;
+    }).toList();
+
+    emit(GetAllSalesSuccessState(filtered));
+  }
+
+  FutureOr<void> _onGetCartItems(
+    GetCartItemsEvent event,
+    Emitter<SalesStates> emit,
+  ) {
+    emit(VariantAddedToCartSuccessState(cartItems: cartItems));
   }
 }

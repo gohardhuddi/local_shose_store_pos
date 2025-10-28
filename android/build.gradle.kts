@@ -19,3 +19,4 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+// Replace 2.x.x with the appropriate version
