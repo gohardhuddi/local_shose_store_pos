@@ -224,6 +224,8 @@ class StockDbWeb implements StockDb {
     required String brand,
     required String articleCode,
     String? articleName,
+    required String category,
+    required String gender,
   }) async {
     final finder = Finder(filter: Filter.equals('article_code', articleCode));
     final now = DateTime.now().toIso8601String();

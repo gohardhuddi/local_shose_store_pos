@@ -28,6 +28,8 @@ class AddStockRepository {
     required String purchasePrice,
     required String suggestedSalePrice,
     required bool isEdit,
+    required String category,
+    required String gender,
   }) {
     return _stockServiceLocal.addStockToDbService(
       brand: brand,
@@ -40,6 +42,8 @@ class AddStockRepository {
       purchasePrice: purchasePrice,
       suggestedSalePrice: suggestedSalePrice,
       isEdit: isEdit,
+      category: category,
+      gender: gender,
     );
   }
 

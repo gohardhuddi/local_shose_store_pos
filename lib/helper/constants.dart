@@ -23,6 +23,7 @@ class CustomStrings {
   static const cartScreenHeading = "Anarkali Shoes Cart";
   static const inventoryManagementSystem = "Inventory Management System";
   static const salesRecord = "Sales Record";
+  static const returnSale = "Return Sales";
 
   // Navigation
   static const sale = "Sale";
@@ -64,7 +65,7 @@ class CustomStrings {
   static const subtract = "Subtract";
 
   // View Stock Screen
-  static const stockTitle = "Stock";
+  static const stockTitle = "Stocks";
   static const searchHint = "Search brand, article, SKU, color, size…";
   static const noStockYet = "No stock yet. Add some!";
   static const noStock = "No stock";
@@ -173,6 +174,8 @@ class CustomStrings {
   static const forgotPassword = "Forgot Password";
   static const pleaseEnterEmail =
       "Please enter the email address you use to create your account confirmation link will be sent to you shortly";
+
+  static String dbname = 'shoe_pos_floor.db';
 }
 
 class CustomColors {

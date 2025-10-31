@@ -1,14 +1,18 @@
 import 'dart:async';
 
 import 'package:floor/floor.dart';
+import 'package:local_shoes_store_pos/services/storage/mobile/seeding/defaults.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
-import '../../../models/dto/sales_summery_query.dart';
+import 'daos/category_dao.dart';
+import 'daos/gender_dao.dart';
 import 'daos/movement_dao.dart';
 import 'daos/product_dao.dart';
 import 'daos/sale_dao.dart';
 import 'daos/sale_line_dao.dart';
 import 'daos/variant_dao.dart';
+import 'entities/category.dart';
+import 'entities/gender.dart';
 import 'entities/inventory_movement.dart';
 import 'entities/product_variants.dart';
 import 'entities/products.dart';
@@ -19,8 +23,16 @@ part 'app_database.g.dart';
 
 // NOTE: Version 8 because we migrate inventory_movements to store SKU (TEXT) with FK to product_variants(sku)
 @Database(
-  version: 11,
-  entities: [Product, ProductVariant, InventoryMovement, Sale, SaleLine],
+  version: 12,
+  entities: [
+    Product,
+    ProductVariant,
+    InventoryMovement,
+    Sale,
+    SaleLine,
+    Category,
+    Gender,
+  ],
 )
 abstract class AppDatabase extends FloorDatabase {
   ProductDao get productDao;
@@ -28,16 +40,24 @@ abstract class AppDatabase extends FloorDatabase {
   InventoryMovementDao get movementDao;
   SaleDao get saleDao;
   SaleLineDao get saleLineDao;
+  CategoryDao get categoryDao;
+  GenderDao get genderDao;
 }
 
 Future<AppDatabase> openMobileDb(String path) async {
-  return $FloorAppDatabase.databaseBuilder(path).addMigrations([
+  final db = await $FloorAppDatabase.databaseBuilder(path).addMigrations([
     migration1to6,
     migration7to8,
     migration8to9,
     migration9to10,
-    migration10to11, // <-- add this
+    migration10to11,
+    migration11to12,
   ]).build();
+
+  // ✅ Seed defaults if needed
+  await seedDefaultData(db);
+
+  return db;
 }
 
 /// ----------------------------
@@ -317,4 +337,43 @@ FROM product_variants_old;
   await db.execute('DROP TABLE product_variants_old;');
 
   await db.execute('PRAGMA foreign_keys = ON;');
+});
+final migration11to12 = Migration(11, 12, (db) async {
+  await db.execute('PRAGMA foreign_keys = ON;');
+
+  // Categories
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS categories (
+    category_id TEXT PRIMARY KEY,
+    category_name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT,
+    is_synced INTEGER NOT NULL DEFAULT 0
+  );
+  ''');
+
+  // Genders
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS genders (
+    gender_id TEXT PRIMARY KEY,
+    gender_name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT,
+    is_synced INTEGER NOT NULL DEFAULT 0
+  );
+  ''');
+
+  // Update products table to include foreign keys
+  await db.execute('ALTER TABLE products ADD COLUMN category_id TEXT;');
+  await db.execute('ALTER TABLE products ADD COLUMN gender_id TEXT;');
+
+  // Optional indexes
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);',
+  );
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_products_gender_id ON products(gender_id);',
+  );
 });

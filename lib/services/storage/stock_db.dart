@@ -11,6 +11,8 @@ abstract class StockDb {
     required String brand,
     required String articleCode, // unique key (e.g., ADSH001)
     String? articleName,
+    required String category,
+    required String gender,
   });
 
   // -------------------------

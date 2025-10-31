@@ -1,9 +1,28 @@
 import 'package:floor/floor.dart';
 
+import 'category.dart';
+import 'gender.dart';
+
 @Entity(
   tableName: 'products',
   indices: [
     Index(value: ['article_code'], unique: true),
+    Index(value: ['category_id']),
+    Index(value: ['gender_id']),
+  ],
+  foreignKeys: [
+    ForeignKey(
+      childColumns: ['category_id'],
+      parentColumns: ['category_id'],
+      entity: Category, // <-- make sure to import your Category entity
+      onDelete: ForeignKeyAction.setNull,
+    ),
+    ForeignKey(
+      childColumns: ['gender_id'],
+      parentColumns: ['gender_id'],
+      entity: Gender, // <-- import Gender entity
+      onDelete: ForeignKeyAction.setNull,
+    ),
   ],
 )
 class Product {
@@ -33,6 +52,13 @@ class Product {
   @ColumnInfo(name: 'updated_at')
   final String updatedAt;
 
+  // ✅ New category & gender references
+  @ColumnInfo(name: 'category_id')
+  final String? categoryId;
+
+  @ColumnInfo(name: 'gender_id')
+  final String? genderId;
+
   const Product({
     this.id,
     required this.brand,
@@ -43,6 +69,8 @@ class Product {
     required this.isSynced,
     required this.createdAt,
     required this.updatedAt,
+    this.categoryId,
+    this.genderId,
   });
 
   Product copyWith({
@@ -55,6 +83,8 @@ class Product {
     int? isSynced,
     String? createdAt,
     String? updatedAt,
+    String? categoryId,
+    String? genderId,
   }) {
     return Product(
       id: id ?? this.id,
@@ -66,6 +96,8 @@ class Product {
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      categoryId: categoryId ?? this.categoryId,
+      genderId: genderId ?? this.genderId,
     );
   }
 }

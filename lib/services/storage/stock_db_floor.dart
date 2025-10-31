@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/services/storage/stock_db.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,6 +9,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../models/cart_model.dart';
 import 'mobile/app_database.dart';
+import 'mobile/entities/category.dart';
+import 'mobile/entities/gender.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
 import 'mobile/entities/products.dart';
@@ -22,7 +25,7 @@ class StockDbFloor implements StockDb {
   @override
   Future<void> init() async {
     final dir = await getApplicationDocumentsDirectory();
-    final path = join(dir.path, 'shoe_pos_floor.db');
+    final path = join(dir.path, CustomStrings.dbname);
     _db = await openMobileDb(path);
     print(path);
   }
@@ -35,26 +38,66 @@ class StockDbFloor implements StockDb {
     required String brand,
     required String articleCode,
     String? articleName,
+    required String category,
+    required String gender,
   }) async {
     final now = DateTime.now().toIso8601String();
 
-    // Check if product exists
-    final existing = await db.productDao.findByArticleCode(articleCode);
+    // --- Ensure Category Exists ---
+    final existingCategory = await db.categoryDao.findByName(category.trim());
+    String categoryId;
+    if (existingCategory != null) {
+      categoryId = existingCategory.categoryId;
+    } else {
+      categoryId = DateTime.now().millisecondsSinceEpoch.toString();
+      final newCategory = Category(
+        categoryId: categoryId,
+        categoryName: category.trim(),
+        isActive: 1,
+        createdAt: now,
+        updatedAt: now,
+        isSynced: 0,
+      );
+      await db.categoryDao.insertCategory(newCategory);
+    }
 
-    if (existing != null) {
-      // Update existing product
-      final updated = existing.copyWith(
+    // --- Ensure Gender Exists ---
+    final existingGender = await db.genderDao.findByName(gender.trim());
+    String genderId;
+    if (existingGender != null) {
+      genderId = existingGender.genderId;
+    } else {
+      genderId = DateTime.now().millisecondsSinceEpoch.toString();
+      final newGender = Gender(
+        genderId: genderId,
+        genderName: gender.trim(),
+        isActive: 1,
+        createdAt: now,
+        updatedAt: now,
+        isSynced: 0,
+      );
+      await db.genderDao.insertGender(newGender);
+    }
+
+    // --- Check if Product Already Exists ---
+    final existingProduct = await db.productDao.findByArticleCode(articleCode);
+
+    if (existingProduct != null) {
+      // Update existing product with new info + category/gender
+      final updated = existingProduct.copyWith(
         brand: brand,
         articleName: articleName,
+        categoryId: categoryId,
+        genderId: genderId,
         updatedAt: now,
         isActive: 1,
         isSynced: 0,
       );
       await db.productDao.updateProduct(updated);
-      return existing.id.toString();
+      return existingProduct.id!;
     }
 
-    // Create new product
+    // --- Create New Product ---
     final newProductID = const Uuid().v4();
     final product = Product(
       id: newProductID,
@@ -65,6 +108,8 @@ class StockDbFloor implements StockDb {
       isSynced: 0,
       createdAt: now,
       updatedAt: now,
+      categoryId: categoryId,
+      genderId: genderId,
     );
 
     await db.productDao.insertProduct(product);
@@ -731,20 +776,20 @@ class StockDbFloor implements StockDb {
         s.amount_paid AS amountPaid,
         s.change_returned AS changeReturned,
         s.date_time AS dateTime,
-        json_group_array(
-          json_object(
-            'saleLineId', sl.sale_line_id,
-            'variantId', sl.variant_id,
-            'sku', v.sku,
-            'qty', sl.qty,
-            'unitPrice', sl.unit_price,
-            'lineTotal', sl.line_total
-          )
-        ) AS saleLines
+        sl.sale_line_id AS saleLineId,
+        sl.variant_id AS variantId,
+        v.sku AS sku,
+        p.brand AS brand,
+        p.article_code AS articleCode,
+        v.size_eu AS sizeEu,
+        v.color_name AS colorName,
+        sl.qty AS qty,
+        sl.unit_price AS unitPrice,
+        sl.line_total AS lineTotal
       FROM sales s
       LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
       LEFT JOIN product_variants v ON v.product_variant_id = sl.variant_id
-      GROUP BY s.sale_id
+      LEFT JOIN products p ON p.product_id = v.product_id
       ORDER BY s.date_time DESC;
     ''');
 
@@ -755,4 +800,41 @@ class StockDbFloor implements StockDb {
       rethrow;
     }
   }
+
+  // @override
+  // Future<List<Map<String, Object?>>> getAllSales() async {
+  //   try {
+  //     final result = await db.database.rawQuery('''
+  //     SELECT
+  //       s.sale_id AS saleId,
+  //       s.total_amount AS totalAmount,
+  //       s.final_amount AS finalAmount,
+  //       s.payment_type AS paymentType,
+  //       s.amount_paid AS amountPaid,
+  //       s.change_returned AS changeReturned,
+  //       s.date_time AS dateTime,
+  //       json_group_array(
+  //         json_object(
+  //           'saleLineId', sl.sale_line_id,
+  //           'variantId', sl.variant_id,
+  //           'sku', v.sku,
+  //           'qty', sl.qty,
+  //           'unitPrice', sl.unit_price,
+  //           'lineTotal', sl.line_total
+  //         )
+  //       ) AS saleLines
+  //     FROM sales s
+  //     LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
+  //     LEFT JOIN product_variants v ON v.product_variant_id = sl.variant_id
+  //     GROUP BY s.sale_id
+  //     ORDER BY s.date_time DESC;
+  //   ''');
+  //
+  //     return result;
+  //   } catch (e, st) {
+  //     debugPrint('❌ getAllSales query failed: $e');
+  //     debugPrintStack(stackTrace: st);
+  //     rethrow;
+  //   }
+  // }
 }

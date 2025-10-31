@@ -24,14 +24,28 @@ class SaleWithLines {
       createdAt: json['createdAt']?.toString() ?? '',
     );
 
-    final saleLinesRaw = json['saleLines'];
+    final dynamic saleLinesRaw = json['saleLines'];
     final List<SaleLineView> lines = [];
 
-    if (saleLinesRaw is String && saleLinesRaw.isNotEmpty) {
-      final decoded = jsonDecode(saleLinesRaw) as List;
-      for (final l in decoded) {
+    if (saleLinesRaw == null) {
+      // No lines
+    } else if (saleLinesRaw is List) {
+      // ✅ Already a list from local DB
+      for (final l in saleLinesRaw) {
         lines.add(SaleLineView.fromJson(l, sale.saleId));
       }
+    } else if (saleLinesRaw is String && saleLinesRaw.isNotEmpty) {
+      // ✅ A JSON string (remote API or stored JSON)
+      try {
+        final decoded = jsonDecode(saleLinesRaw) as List;
+        for (final l in decoded) {
+          lines.add(SaleLineView.fromJson(l, sale.saleId));
+        }
+      } catch (e) {
+        print('⚠️ Failed to decode saleLines JSON: $e');
+      }
+    } else {
+      print('⚠️ Unknown saleLines type: ${saleLinesRaw.runtimeType}');
     }
 
     return SaleWithLines(sale: sale, lines: lines);

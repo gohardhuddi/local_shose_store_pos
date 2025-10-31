@@ -82,13 +82,17 @@ class _$AppDatabase extends AppDatabase {
 
   SaleLineDao? _saleLineDaoInstance;
 
+  CategoryDao? _categoryDaoInstance;
+
+  GenderDao? _genderDaoInstance;
+
   Future<sqflite.Database> open(
     String path,
     List<Migration> migrations, [
     Callback? callback,
   ]) async {
     final databaseOptions = sqflite.OpenDatabaseOptions(
-      version: 11,
+      version: 12,
       onConfigure: (database) async {
         await database.execute('PRAGMA foreign_keys = ON');
         await callback?.onConfigure?.call(database);
@@ -104,7 +108,7 @@ class _$AppDatabase extends AppDatabase {
       },
       onCreate: (database, version) async {
         await database.execute(
-            'CREATE TABLE IF NOT EXISTS `products` (`product_id` TEXT, `brand` TEXT NOT NULL, `article_code` TEXT NOT NULL, `article_name` TEXT, `notes` TEXT, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY (`product_id`))');
+            'CREATE TABLE IF NOT EXISTS `products` (`product_id` TEXT, `brand` TEXT NOT NULL, `article_code` TEXT NOT NULL, `article_name` TEXT, `notes` TEXT, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, `category_id` TEXT, `gender_id` TEXT, FOREIGN KEY (`category_id`) REFERENCES `categories` (`category_id`) ON UPDATE NO ACTION ON DELETE SET NULL, FOREIGN KEY (`gender_id`) REFERENCES `genders` (`gender_id`) ON UPDATE NO ACTION ON DELETE SET NULL, PRIMARY KEY (`product_id`))');
         await database.execute(
             'CREATE TABLE IF NOT EXISTS `product_variants` (`product_variant_id` TEXT, `product_id` TEXT NOT NULL, `size_eu` INTEGER NOT NULL, `color_name` TEXT NOT NULL, `color_hex` TEXT, `sku` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `purchase_price` REAL NOT NULL, `sale_price` REAL, `is_active` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON UPDATE NO ACTION ON DELETE CASCADE, PRIMARY KEY (`product_variant_id`))');
         await database.execute(
@@ -114,7 +118,15 @@ class _$AppDatabase extends AppDatabase {
         await database.execute(
             'CREATE TABLE IF NOT EXISTS `sale_lines` (`sale_line_id` TEXT NOT NULL, `sale_id` TEXT NOT NULL, `variant_id` TEXT NOT NULL, `qty` INTEGER NOT NULL, `unit_price` REAL NOT NULL, `line_total` REAL NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, FOREIGN KEY (`sale_id`) REFERENCES `sales` (`sale_id`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`product_variant_id`) ON UPDATE NO ACTION ON DELETE RESTRICT, PRIMARY KEY (`sale_line_id`))');
         await database.execute(
+            'CREATE TABLE IF NOT EXISTS `categories` (`category_id` TEXT NOT NULL, `category_name` TEXT NOT NULL, `is_active` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`category_id`))');
+        await database.execute(
+            'CREATE TABLE IF NOT EXISTS `genders` (`gender_id` TEXT NOT NULL, `gender_name` TEXT NOT NULL, `is_active` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`gender_id`))');
+        await database.execute(
             'CREATE UNIQUE INDEX `index_products_article_code` ON `products` (`article_code`)');
+        await database.execute(
+            'CREATE INDEX `index_products_category_id` ON `products` (`category_id`)');
+        await database.execute(
+            'CREATE INDEX `index_products_gender_id` ON `products` (`gender_id`)');
         await database.execute(
             'CREATE INDEX `index_product_variants_product_id` ON `product_variants` (`product_id`)');
         await database.execute(
@@ -131,6 +143,10 @@ class _$AppDatabase extends AppDatabase {
             'CREATE INDEX `index_sale_lines_sale_id` ON `sale_lines` (`sale_id`)');
         await database.execute(
             'CREATE INDEX `index_sale_lines_variant_id` ON `sale_lines` (`variant_id`)');
+        await database.execute(
+            'CREATE UNIQUE INDEX `index_categories_category_name` ON `categories` (`category_name`)');
+        await database.execute(
+            'CREATE UNIQUE INDEX `index_genders_gender_name` ON `genders` (`gender_name`)');
 
         await callback?.onCreate?.call(database, version);
       },
@@ -164,6 +180,16 @@ class _$AppDatabase extends AppDatabase {
   SaleLineDao get saleLineDao {
     return _saleLineDaoInstance ??= _$SaleLineDao(database, changeListener);
   }
+
+  @override
+  CategoryDao get categoryDao {
+    return _categoryDaoInstance ??= _$CategoryDao(database, changeListener);
+  }
+
+  @override
+  GenderDao get genderDao {
+    return _genderDaoInstance ??= _$GenderDao(database, changeListener);
+  }
 }
 
 class _$ProductDao extends ProductDao {
@@ -183,7 +209,9 @@ class _$ProductDao extends ProductDao {
                   'is_active': item.isActive,
                   'is_synced': item.isSynced,
                   'created_at': item.createdAt,
-                  'updated_at': item.updatedAt
+                  'updated_at': item.updatedAt,
+                  'category_id': item.categoryId,
+                  'gender_id': item.genderId
                 }),
         _productUpdateAdapter = UpdateAdapter(
             database,
@@ -198,7 +226,9 @@ class _$ProductDao extends ProductDao {
                   'is_active': item.isActive,
                   'is_synced': item.isSynced,
                   'created_at': item.createdAt,
-                  'updated_at': item.updatedAt
+                  'updated_at': item.updatedAt,
+                  'category_id': item.categoryId,
+                  'gender_id': item.genderId
                 });
 
   final sqflite.DatabaseExecutor database;
@@ -224,7 +254,9 @@ class _$ProductDao extends ProductDao {
             isActive: row['is_active'] as int,
             isSynced: row['is_synced'] as int,
             createdAt: row['created_at'] as String,
-            updatedAt: row['updated_at'] as String),
+            updatedAt: row['updated_at'] as String,
+            categoryId: row['category_id'] as String?,
+            genderId: row['gender_id'] as String?),
         arguments: [articleCode]);
   }
 
@@ -240,7 +272,9 @@ class _$ProductDao extends ProductDao {
             isActive: row['is_active'] as int,
             isSynced: row['is_synced'] as int,
             createdAt: row['created_at'] as String,
-            updatedAt: row['updated_at'] as String));
+            updatedAt: row['updated_at'] as String,
+            categoryId: row['category_id'] as String?,
+            genderId: row['gender_id'] as String?));
   }
 
   @override
@@ -255,11 +289,13 @@ class _$ProductDao extends ProductDao {
             isActive: row['is_active'] as int,
             isSynced: row['is_synced'] as int,
             createdAt: row['created_at'] as String,
-            updatedAt: row['updated_at'] as String));
+            updatedAt: row['updated_at'] as String,
+            categoryId: row['category_id'] as String?,
+            genderId: row['gender_id'] as String?));
   }
 
   @override
-  Future<void> markSynced(int id) async {
+  Future<void> markSynced(String id) async {
     await _queryAdapter.queryNoReturn(
         'UPDATE products SET is_synced = 1 WHERE product_id = ?1',
         arguments: [id]);
@@ -277,9 +313,46 @@ class _$ProductDao extends ProductDao {
   }
 
   @override
-  Future<int> insertProduct(Product p) {
-    return _productInsertionAdapter.insertAndReturnId(
-        p, OnConflictStrategy.abort);
+  Future<List<Product>> findByCategory(String categoryId) async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM products WHERE category_id = ?1',
+        mapper: (Map<String, Object?> row) => Product(
+            id: row['product_id'] as String?,
+            brand: row['brand'] as String,
+            articleCode: row['article_code'] as String,
+            articleName: row['article_name'] as String?,
+            notes: row['notes'] as String?,
+            isActive: row['is_active'] as int,
+            isSynced: row['is_synced'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String,
+            categoryId: row['category_id'] as String?,
+            genderId: row['gender_id'] as String?),
+        arguments: [categoryId]);
+  }
+
+  @override
+  Future<List<Product>> findByGender(String genderId) async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM products WHERE gender_id = ?1',
+        mapper: (Map<String, Object?> row) => Product(
+            id: row['product_id'] as String?,
+            brand: row['brand'] as String,
+            articleCode: row['article_code'] as String,
+            articleName: row['article_name'] as String?,
+            notes: row['notes'] as String?,
+            isActive: row['is_active'] as int,
+            isSynced: row['is_synced'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String,
+            categoryId: row['category_id'] as String?,
+            genderId: row['gender_id'] as String?),
+        arguments: [genderId]);
+  }
+
+  @override
+  Future<void> insertProduct(Product p) async {
+    await _productInsertionAdapter.insert(p, OnConflictStrategy.abort);
   }
 
   @override
@@ -878,5 +951,311 @@ class _$SaleLineDao extends SaleLineDao {
   @override
   Future<void> deleteSaleLine(SaleLine line) async {
     await _saleLineDeletionAdapter.delete(line);
+  }
+}
+
+class _$CategoryDao extends CategoryDao {
+  _$CategoryDao(
+    this.database,
+    this.changeListener,
+  )   : _queryAdapter = QueryAdapter(database),
+        _categoryInsertionAdapter = InsertionAdapter(
+            database,
+            'categories',
+            (Category item) => <String, Object?>{
+                  'category_id': item.categoryId,
+                  'category_name': item.categoryName,
+                  'is_active': item.isActive,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt,
+                  'is_synced': item.isSynced
+                }),
+        _categoryUpdateAdapter = UpdateAdapter(
+            database,
+            'categories',
+            ['category_id'],
+            (Category item) => <String, Object?>{
+                  'category_id': item.categoryId,
+                  'category_name': item.categoryName,
+                  'is_active': item.isActive,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt,
+                  'is_synced': item.isSynced
+                }),
+        _categoryDeletionAdapter = DeletionAdapter(
+            database,
+            'categories',
+            ['category_id'],
+            (Category item) => <String, Object?>{
+                  'category_id': item.categoryId,
+                  'category_name': item.categoryName,
+                  'is_active': item.isActive,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt,
+                  'is_synced': item.isSynced
+                });
+
+  final sqflite.DatabaseExecutor database;
+
+  final StreamController<String> changeListener;
+
+  final QueryAdapter _queryAdapter;
+
+  final InsertionAdapter<Category> _categoryInsertionAdapter;
+
+  final UpdateAdapter<Category> _categoryUpdateAdapter;
+
+  final DeletionAdapter<Category> _categoryDeletionAdapter;
+
+  @override
+  Future<Category?> findById(String id) async {
+    return _queryAdapter.query(
+        'SELECT * FROM categories WHERE category_id = ?1 LIMIT 1',
+        mapper: (Map<String, Object?> row) => Category(
+            categoryId: row['category_id'] as String,
+            categoryName: row['category_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int),
+        arguments: [id]);
+  }
+
+  @override
+  Future<Category?> findByName(String name) async {
+    return _queryAdapter.query(
+        'SELECT * FROM categories WHERE category_name = ?1 LIMIT 1',
+        mapper: (Map<String, Object?> row) => Category(
+            categoryId: row['category_id'] as String,
+            categoryName: row['category_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int),
+        arguments: [name]);
+  }
+
+  @override
+  Future<List<Category>> all() async {
+    return _queryAdapter.queryList('SELECT * FROM categories',
+        mapper: (Map<String, Object?> row) => Category(
+            categoryId: row['category_id'] as String,
+            categoryName: row['category_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int));
+  }
+
+  @override
+  Future<List<Category>> findActive() async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM categories WHERE is_active = 1',
+        mapper: (Map<String, Object?> row) => Category(
+            categoryId: row['category_id'] as String,
+            categoryName: row['category_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int));
+  }
+
+  @override
+  Future<List<Category>> findUnsynced() async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM categories WHERE is_synced = 0',
+        mapper: (Map<String, Object?> row) => Category(
+            categoryId: row['category_id'] as String,
+            categoryName: row['category_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int));
+  }
+
+  @override
+  Future<void> markSynced(String id) async {
+    await _queryAdapter.queryNoReturn(
+        'UPDATE categories SET is_synced = 1 WHERE category_id = ?1',
+        arguments: [id]);
+  }
+
+  @override
+  Future<void> setActive(
+    String id,
+    int active,
+    String updatedAt,
+  ) async {
+    await _queryAdapter.queryNoReturn(
+        'UPDATE categories SET is_active = ?2, updated_at = ?3 WHERE category_id = ?1',
+        arguments: [id, active, updatedAt]);
+  }
+
+  @override
+  Future<void> insertCategory(Category c) async {
+    await _categoryInsertionAdapter.insert(c, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<int> updateCategory(Category c) {
+    return _categoryUpdateAdapter.updateAndReturnChangedRows(
+        c, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<void> deleteCategory(Category c) async {
+    await _categoryDeletionAdapter.delete(c);
+  }
+}
+
+class _$GenderDao extends GenderDao {
+  _$GenderDao(
+    this.database,
+    this.changeListener,
+  )   : _queryAdapter = QueryAdapter(database),
+        _genderInsertionAdapter = InsertionAdapter(
+            database,
+            'genders',
+            (Gender item) => <String, Object?>{
+                  'gender_id': item.genderId,
+                  'gender_name': item.genderName,
+                  'is_active': item.isActive,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt,
+                  'is_synced': item.isSynced
+                }),
+        _genderUpdateAdapter = UpdateAdapter(
+            database,
+            'genders',
+            ['gender_id'],
+            (Gender item) => <String, Object?>{
+                  'gender_id': item.genderId,
+                  'gender_name': item.genderName,
+                  'is_active': item.isActive,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt,
+                  'is_synced': item.isSynced
+                }),
+        _genderDeletionAdapter = DeletionAdapter(
+            database,
+            'genders',
+            ['gender_id'],
+            (Gender item) => <String, Object?>{
+                  'gender_id': item.genderId,
+                  'gender_name': item.genderName,
+                  'is_active': item.isActive,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt,
+                  'is_synced': item.isSynced
+                });
+
+  final sqflite.DatabaseExecutor database;
+
+  final StreamController<String> changeListener;
+
+  final QueryAdapter _queryAdapter;
+
+  final InsertionAdapter<Gender> _genderInsertionAdapter;
+
+  final UpdateAdapter<Gender> _genderUpdateAdapter;
+
+  final DeletionAdapter<Gender> _genderDeletionAdapter;
+
+  @override
+  Future<Gender?> findById(String id) async {
+    return _queryAdapter.query(
+        'SELECT * FROM genders WHERE gender_id = ?1 LIMIT 1',
+        mapper: (Map<String, Object?> row) => Gender(
+            genderId: row['gender_id'] as String,
+            genderName: row['gender_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int),
+        arguments: [id]);
+  }
+
+  @override
+  Future<Gender?> findByName(String name) async {
+    return _queryAdapter.query(
+        'SELECT * FROM genders WHERE gender_name = ?1 LIMIT 1',
+        mapper: (Map<String, Object?> row) => Gender(
+            genderId: row['gender_id'] as String,
+            genderName: row['gender_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int),
+        arguments: [name]);
+  }
+
+  @override
+  Future<List<Gender>> all() async {
+    return _queryAdapter.queryList('SELECT * FROM genders',
+        mapper: (Map<String, Object?> row) => Gender(
+            genderId: row['gender_id'] as String,
+            genderName: row['gender_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int));
+  }
+
+  @override
+  Future<List<Gender>> findActive() async {
+    return _queryAdapter.queryList('SELECT * FROM genders WHERE is_active = 1',
+        mapper: (Map<String, Object?> row) => Gender(
+            genderId: row['gender_id'] as String,
+            genderName: row['gender_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int));
+  }
+
+  @override
+  Future<List<Gender>> findUnsynced() async {
+    return _queryAdapter.queryList('SELECT * FROM genders WHERE is_synced = 0',
+        mapper: (Map<String, Object?> row) => Gender(
+            genderId: row['gender_id'] as String,
+            genderName: row['gender_name'] as String,
+            isActive: row['is_active'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String?,
+            isSynced: row['is_synced'] as int));
+  }
+
+  @override
+  Future<void> markSynced(String id) async {
+    await _queryAdapter.queryNoReturn(
+        'UPDATE genders SET is_synced = 1 WHERE gender_id = ?1',
+        arguments: [id]);
+  }
+
+  @override
+  Future<void> setActive(
+    String id,
+    int active,
+    String updatedAt,
+  ) async {
+    await _queryAdapter.queryNoReturn(
+        'UPDATE genders SET is_active = ?2, updated_at = ?3 WHERE gender_id = ?1',
+        arguments: [id, active, updatedAt]);
+  }
+
+  @override
+  Future<void> insertGender(Gender g) async {
+    await _genderInsertionAdapter.insert(g, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<int> updateGender(Gender g) {
+    return _genderUpdateAdapter.updateAndReturnChangedRows(
+        g, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<void> deleteGender(Gender g) async {
+    await _genderDeletionAdapter.delete(g);
   }
 }

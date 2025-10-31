@@ -50,6 +50,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
       appBar: AppBar(
         title: Text('${CustomStrings.shopName} ${CustomStrings.stockTitle}'),
         centerTitle: true,
+        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),

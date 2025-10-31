@@ -146,3 +146,5 @@ class SearchSalesEvent extends SalesEvents {
   @override
   List<Object> get props => [query];
 }
+
+class ClearSalesSearchEvent extends SalesEvents {}

@@ -174,6 +174,10 @@ class _POSHomeScreenState extends State<POSHomeScreen>
     // ✅ Mobile layout (FAB visible)
     if (!isWide) {
       return Scaffold(
+        appBar: AppBar(
+          title: Text(CustomStrings.saleScreenHeading),
+          centerTitle: true,
+        ),
         body: Column(
           children: [
             searchField,

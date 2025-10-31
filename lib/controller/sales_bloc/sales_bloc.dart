@@ -21,6 +21,7 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     on<GetSalesByDateRangeEvent>(_onGetSalesByDateRange);
     on<GetCartItemsEvent>(_onGetCartItems);
     on<SearchSalesEvent>(_onSearchSales); // 👈 ADD THIS
+    on<ClearSalesSearchEvent>(_onClearSalesSearchEvent);
   }
 
   List<CartItemModel> cartItems = [];
@@ -87,6 +88,7 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     try {
       emit(SalesLoadingState());
       final sales = await _salesRepository.getAllSalesWithLines();
+      print(sales);
       _allSales = sales; // store master copy
       emit(GetAllSalesSuccessState(sales));
     } catch (e) {
@@ -111,11 +113,15 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     }
   }
 
-  // 🔍 NEW SEARCH HANDLER
-  void _onSearchSales(SearchSalesEvent event, Emitter<SalesStates> emit) {
+  void _onSearchSales(SearchSalesEvent event, Emitter<SalesStates> emit) async {
     final query = event.query.trim().toLowerCase();
 
-    // If query empty → return full list
+    // If no cached data, fetch first
+    if (_allSales.isEmpty) {
+      final sales = await _salesRepository.getAllSalesWithLines();
+      _allSales = sales;
+    }
+
     if (query.isEmpty) {
       emit(GetAllSalesSuccessState(_allSales));
       return;
@@ -123,10 +129,9 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
 
     final filtered = _allSales.where((saleWithLines) {
       final sale = saleWithLines.sale;
-      final dateStr = sale.dateTime; // e.g., "2025-01-28"
+      final dateStr = sale.dateTime;
 
-      // --- ✅ DATE FILTERING ---
-      // Parse and format date in multiple formats
+      // Try parsing the date
       DateTime? saleDate;
       try {
         saleDate = DateTime.parse(dateStr);
@@ -134,50 +139,115 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
         saleDate = null;
       }
 
-      String formattedDate1 = saleDate != null
-          ? DateFormat('dd-MM-yyyy').format(saleDate)
-          : '';
-      String formattedDate2 = saleDate != null
-          ? DateFormat('dd/MM/yyyy').format(saleDate)
-          : '';
-      String formattedDate3 = saleDate != null
-          ? DateFormat('dd MMM yyyy').format(saleDate)
-          : '';
-      String formattedDate4 = saleDate != null
-          ? DateFormat('yyyy-MM-dd').format(saleDate)
-          : '';
+      // Multiple date formats for matching
+      final formattedDates = [
+        if (saleDate != null) DateFormat('dd-MM-yyyy').format(saleDate),
+        if (saleDate != null) DateFormat('dd/MM/yyyy').format(saleDate),
+        if (saleDate != null) DateFormat('dd MMM yyyy').format(saleDate),
+        if (saleDate != null) DateFormat('yyyy-MM-dd').format(saleDate),
+      ];
 
-      final dateMatch =
-          formattedDate1.toLowerCase().contains(query) ||
-          formattedDate2.toLowerCase().contains(query) ||
-          formattedDate3.toLowerCase().contains(query) ||
-          formattedDate4.toLowerCase().contains(query) ||
-          saleDate?.month.toString().padLeft(2, '0').contains(query) == true ||
-          saleDate?.year.toString().contains(query) == true ||
-          DateFormat(
-            'MMM',
-          ).format(saleDate ?? DateTime(2000)).toLowerCase().contains(query);
+      // 🔍 Sale ID match (new)
+      final saleIdMatch =
+          sale.saleId.toLowerCase().contains(query) ||
+          sale.saleId.replaceAll('-', '').toLowerCase().contains(query);
 
-      // --- 💰 AMOUNT MATCH (partial number or text) ---
-      final amountMatch = sale.totalAmount.toString().toLowerCase().contains(
-        query,
+      // 💰 Amount match
+      final amountMatch =
+          sale.totalAmount.toString().toLowerCase().contains(query) ||
+          sale.finalAmount.toString().toLowerCase().contains(query);
+
+      // 🗓️ Date match
+      final dateMatch = formattedDates.any(
+        (d) => d.toLowerCase().contains(query),
       );
 
-      // --- 📦 SKU MATCH (any line item) ---
+      // 📦 SKU / product match
       final skuMatch = saleWithLines.lines.any(
         (line) => line.sku.toLowerCase().contains(query),
       );
 
-      return dateMatch || amountMatch || skuMatch;
+      return saleIdMatch || dateMatch || amountMatch || skuMatch;
     }).toList();
 
     emit(GetAllSalesSuccessState(filtered));
   }
+
+  // 🔍 NEW SEARCH HANDLER
+  // void _onSearchSales(SearchSalesEvent event, Emitter<SalesStates> emit) {
+  //   final query = event.query.trim().toLowerCase();
+  //
+  //   // If query empty → return full list
+  //   if (query.isEmpty) {
+  //     emit(GetAllSalesSuccessState(_allSales));
+  //     return;
+  //   }
+  //
+  //   final filtered = _allSales.where((saleWithLines) {
+  //     final sale = saleWithLines.sale;
+  //     final dateStr = sale.dateTime; // e.g., "2025-01-28"
+  //
+  //     // --- ✅ DATE FILTERING ---
+  //     // Parse and format date in multiple formats
+  //     DateTime? saleDate;
+  //     try {
+  //       saleDate = DateTime.parse(dateStr);
+  //     } catch (_) {
+  //       saleDate = null;
+  //     }
+  //
+  //     String formattedDate1 = saleDate != null
+  //         ? DateFormat('dd-MM-yyyy').format(saleDate)
+  //         : '';
+  //     String formattedDate2 = saleDate != null
+  //         ? DateFormat('dd/MM/yyyy').format(saleDate)
+  //         : '';
+  //     String formattedDate3 = saleDate != null
+  //         ? DateFormat('dd MMM yyyy').format(saleDate)
+  //         : '';
+  //     String formattedDate4 = saleDate != null
+  //         ? DateFormat('yyyy-MM-dd').format(saleDate)
+  //         : '';
+  //
+  //     final dateMatch =
+  //         formattedDate1.toLowerCase().contains(query) ||
+  //         formattedDate2.toLowerCase().contains(query) ||
+  //         formattedDate3.toLowerCase().contains(query) ||
+  //         formattedDate4.toLowerCase().contains(query) ||
+  //         saleDate?.month.toString().padLeft(2, '0').contains(query) == true ||
+  //         saleDate?.year.toString().contains(query) == true ||
+  //         DateFormat(
+  //           'MMM',
+  //         ).format(saleDate ?? DateTime(2000)).toLowerCase().contains(query);
+  //
+  //     // --- 💰 AMOUNT MATCH (partial number or text) ---
+  //     final amountMatch = sale.totalAmount.toString().toLowerCase().contains(
+  //       query,
+  //     );
+  //
+  //     // --- 📦 SKU MATCH (any line item) ---
+  //     final skuMatch = saleWithLines.lines.any(
+  //       (line) => line.sku.toLowerCase().contains(query),
+  //     );
+  //
+  //     return dateMatch || amountMatch || skuMatch;
+  //   }).toList();
+  //
+  //   emit(GetAllSalesSuccessState(filtered));
+  // }
 
   FutureOr<void> _onGetCartItems(
     GetCartItemsEvent event,
     Emitter<SalesStates> emit,
   ) {
     emit(VariantAddedToCartSuccessState(cartItems: cartItems));
+  }
+
+  Future<void> _onClearSalesSearchEvent(
+    ClearSalesSearchEvent event,
+    Emitter<SalesStates> emit,
+  ) async {
+    // Clear search results (return empty state for UI)
+    emit(GetAllSalesSuccessState([]));
   }
 }

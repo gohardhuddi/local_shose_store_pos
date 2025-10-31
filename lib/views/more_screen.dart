@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:local_shoes_store_pos/views/pos/view_sales.dart';
 import 'package:local_shoes_store_pos/views/settings_screen.dart';
 
+import '../helper/constants.dart';
+
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
 
@@ -35,18 +37,13 @@ class _MoreScreenState extends State<MoreScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text('${CustomStrings.shopName} ${CustomStrings.settings}'),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: ListView(
         children: [
-          buildTile(
-            icon: Icons.settings,
-            title: "Settings",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => SettingsScreen()),
-              );
-            },
-          ),
           buildTile(
             icon: Icons.receipt_long,
             title: "View Sales History",
@@ -54,6 +51,16 @@ class _MoreScreenState extends State<MoreScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ViewSalesScreen()),
+              );
+            },
+          ),
+          buildTile(
+            icon: Icons.settings,
+            title: "Settings",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => SettingsScreen()),
               );
             },
           ),

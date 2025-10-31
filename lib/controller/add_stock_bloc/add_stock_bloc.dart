@@ -34,6 +34,8 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       purchasePrice: event.purchasePrice,
       suggestedSalePrice: event.suggestedSalePrice,
       isEdit: event.isEdit,
+      category: event.category,
+      gender: event.gender,
     );
 
     // Optionally reload list here if your UI expects fresh data:
@@ -59,8 +61,10 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       productID: event.productID,
       variantID: event.variantID,
       // If you want to set quantity exactly to event.quantity:
-      newQuantity: event.quantity, // ← triggers movement if changed
-      movementId: movementId, // ← idempotency
+      newQuantity: event.quantity,
+      // ← triggers movement if changed
+      movementId: movementId,
+      // ← idempotency
       dateTimeIso: DateTime.now().toIso8601String(),
       isSynced: false,
     );

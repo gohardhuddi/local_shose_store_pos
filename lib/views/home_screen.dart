@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:local_shoes_store_pos/views/pos/pos_home_screen.dart';
 import 'package:local_shoes_store_pos/views/pos/view_sales.dart';
+import 'package:local_shoes_store_pos/views/return/return_home_Screen.dart';
 import 'package:local_shoes_store_pos/views/settings_screen.dart';
 import 'package:local_shoes_store_pos/views/view_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
@@ -49,8 +50,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!isNowDesktop && _selectedIndex >= _screensMobile.length) {
         setState(() {
-          _selectedIndex = 0;
-          _controller.index = 0;
+          _selectedIndex = 3;
+          _controller.index = 3;
           _updateTitle();
         });
       }
@@ -83,15 +84,16 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> get _screensMobile => [
     POSHomeScreen(),
     ViewStockScreen(),
-    Center(child: Text('Profile Page')),
+    ReturnHomeScreen(),
     MoreScreen(),
   ];
   List<Widget> get _screensDesktop => [
     POSHomeScreen(),
     ViewStockScreen(),
-    Center(child: Text('Profile Page')),
-    SettingsScreen(),
+
+    ReturnHomeScreen(),
     ViewSalesScreen(),
+    SettingsScreen(),
   ];
 
   List<PersistentBottomNavBarItem> _navItems(BuildContext context) {
@@ -113,8 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
         inactiveColorPrimary: inactive,
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(CupertinoIcons.person),
-        title: CustomStrings.profilePage,
+        icon: Icon(Icons.keyboard_return_rounded),
+        title: CustomStrings.returnSale,
         activeColorPrimary: active,
         inactiveColorPrimary: inactive,
       ),
@@ -134,23 +136,25 @@ class _HomeScreenState extends State<HomeScreen> {
         theme.colorScheme.surface;
 
     return SafeArea(
-      child: Column(
-        children: [
-          AppBar(title: Text(_appBarTitle), centerTitle: true),
-          Expanded(
-            child: PersistentTabView(
-              context,
-              controller: _controller,
-              screens: _screensMobile,
-              items: _navItems(context),
-              backgroundColor: bgColor,
-              handleAndroidBackButtonPress: true,
-              resizeToAvoidBottomInset: true,
-              stateManagement: true,
-              navBarStyle: NavBarStyle.style6,
+      child: Scaffold(
+        body: Column(
+          children: [
+            // AppBar(title: Text(_appBarTitle), centerTitle: true),
+            Expanded(
+              child: PersistentTabView(
+                context,
+                controller: _controller,
+                screens: _screensMobile,
+                items: _navItems(context),
+                backgroundColor: bgColor,
+                handleAndroidBackButtonPress: true,
+                resizeToAvoidBottomInset: true,
+                stateManagement: true,
+                navBarStyle: NavBarStyle.style6,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -181,16 +185,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(CustomStrings.stock),
               ),
               NavigationRailDestination(
-                icon: Icon(CupertinoIcons.person),
-                label: Text(CustomStrings.profilePage),
-              ),
-              NavigationRailDestination(
-                icon: Icon(CupertinoIcons.settings),
-                label: Text(CustomStrings.settings),
+                icon: Icon(Icons.keyboard_return_rounded),
+                label: Text(CustomStrings.returnSale),
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.receipt_long),
                 label: Text(CustomStrings.salesRecord),
+              ),
+
+              NavigationRailDestination(
+                icon: Icon(CupertinoIcons.settings),
+                label: Text(CustomStrings.settings),
               ),
             ],
           ),

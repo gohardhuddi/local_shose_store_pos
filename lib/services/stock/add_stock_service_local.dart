@@ -42,11 +42,15 @@ class StockServiceLocal {
     required String purchasePrice,
     required String suggestedSalePrice,
     required bool isEdit,
+    required String category,
+    required String gender,
   }) async {
     final productId = await stockDb.upsertProduct(
       brand: _normStr(brand),
       articleCode: _normUpper(articleCode),
       articleName: _normStr(articleName),
+      category: category,
+      gender: gender,
     );
 
     await stockDb.upsertVariant(
