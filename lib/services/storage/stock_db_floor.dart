@@ -5,6 +5,7 @@ import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/services/storage/stock_db.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:uuid/uuid.dart';
 
 import '../../models/cart_model.dart';
@@ -14,6 +15,8 @@ import 'mobile/entities/gender.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
 import 'mobile/entities/products.dart';
+import 'mobile/entities/return_entity.dart';
+import 'mobile/entities/return_line.dart';
 import 'mobile/entities/sale.dart';
 import 'mobile/entities/sale_line.dart';
 
@@ -699,7 +702,6 @@ class StockDbFloor implements StockDb {
   }
 
   @override
-  @override
   Future<List<Map<String, Object?>>> getSalesSummery({
     required String startDate,
     required String endDate,
@@ -801,40 +803,81 @@ class StockDbFloor implements StockDb {
     }
   }
 
-  // @override
-  // Future<List<Map<String, Object?>>> getAllSales() async {
-  //   try {
-  //     final result = await db.database.rawQuery('''
-  //     SELECT
-  //       s.sale_id AS saleId,
-  //       s.total_amount AS totalAmount,
-  //       s.final_amount AS finalAmount,
-  //       s.payment_type AS paymentType,
-  //       s.amount_paid AS amountPaid,
-  //       s.change_returned AS changeReturned,
-  //       s.date_time AS dateTime,
-  //       json_group_array(
-  //         json_object(
-  //           'saleLineId', sl.sale_line_id,
-  //           'variantId', sl.variant_id,
-  //           'sku', v.sku,
-  //           'qty', sl.qty,
-  //           'unitPrice', sl.unit_price,
-  //           'lineTotal', sl.line_total
-  //         )
-  //       ) AS saleLines
-  //     FROM sales s
-  //     LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
-  //     LEFT JOIN product_variants v ON v.product_variant_id = sl.variant_id
-  //     GROUP BY s.sale_id
-  //     ORDER BY s.date_time DESC;
-  //   ''');
-  //
-  //     return result;
-  //   } catch (e, st) {
-  //     debugPrint('❌ getAllSales query failed: $e');
-  //     debugPrintStack(stackTrace: st);
-  //     rethrow;
-  //   }
-  // }
+  @override
+  Future<String> performReturnTransaction({
+    required String saleId,
+    required List<CartItemModel> returnedItems,
+    required double totalRefund,
+    String? reason,
+    String? createdBy,
+    bool isSynced = false,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final returnId = const Uuid().v4();
+
+    // ✅ 1. Build parent record
+    final returnEntity = ReturnEntity(
+      returnId: returnId,
+      saleId: saleId,
+      dateTime: now,
+      totalRefund: totalRefund,
+      reason: reason,
+      createdBy: createdBy,
+      isSynced: isSynced ? 1 : 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    // ✅ 2. Build all return line objects
+    final returnLines = returnedItems.map((item) {
+      return ReturnLine(
+        returnLineId: const Uuid().v4(),
+        returnId: returnId,
+        variantId: item.variant.variantId,
+        qty: item.cartQty,
+        unitPrice: item.variant.salePrice,
+        refundAmount: item.variant.salePrice * item.cartQty,
+        isSynced: isSynced ? 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      );
+    }).toList();
+
+    // ✅ 3. Start SQL transaction
+    final rawDb = db.database as sqflite.Database;
+    await rawDb.transaction((txn) async {
+      // Step A — Insert return + lines in one atomic Floor transaction
+      await db.insertReturnAndLines(returnEntity, returnLines);
+
+      // Step B — Update inventory quantities & log movements
+      for (final item in returnedItems) {
+        final variants = await db.variantDao.findByVariantId(
+          item.variant.variantId,
+        );
+        if (variants.isEmpty) throw StateError('Variant not found');
+
+        final variant = variants.first;
+        final newQty = variant.quantity + item.cartQty;
+
+        final updatedVariant = variant.copyWith(
+          quantity: newQty,
+          updatedAt: now,
+          isSynced: 0,
+        );
+        await db.variantDao.updateVariant(updatedVariant);
+
+        // Step C — Add inventory movement
+        await addInventoryMovement(
+          movementId: const Uuid().v4(),
+          productVariantId: item.variant.variantId,
+          quantity: item.cartQty,
+          action: 'return_in',
+          dateTime: now,
+          isSynced: isSynced,
+        );
+      }
+    });
+
+    return returnId;
+  }
 }

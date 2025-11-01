@@ -749,4 +749,17 @@ class StockDbWeb implements StockDb {
     // TODO: implement getSalesByDateRange
     throw UnimplementedError();
   }
+
+  @override
+  Future<String> performReturnTransaction({
+    required String saleId,
+    required List<CartItemModel> returnedItems,
+    required double totalRefund,
+    String? reason,
+    String? createdBy,
+    bool isSynced = false,
+  }) {
+    // TODO: implement performReturnTransaction
+    throw UnimplementedError();
+  }
 }

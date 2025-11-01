@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:floor/floor.dart';
+import 'package:local_shoes_store_pos/services/storage/mobile/daos/return_dao.dart';
+import 'package:local_shoes_store_pos/services/storage/mobile/daos/returnline-dao.dart';
 import 'package:local_shoes_store_pos/services/storage/mobile/seeding/defaults.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
@@ -16,6 +18,8 @@ import 'entities/gender.dart';
 import 'entities/inventory_movement.dart';
 import 'entities/product_variants.dart';
 import 'entities/products.dart';
+import 'entities/return_entity.dart';
+import 'entities/return_line.dart';
 import 'entities/sale.dart';
 import 'entities/sale_line.dart';
 
@@ -32,6 +36,8 @@ part 'app_database.g.dart';
     SaleLine,
     Category,
     Gender,
+    ReturnEntity, // ✅ Added
+    ReturnLine, // ✅ Added
   ],
 )
 abstract class AppDatabase extends FloorDatabase {
@@ -42,6 +48,18 @@ abstract class AppDatabase extends FloorDatabase {
   SaleLineDao get saleLineDao;
   CategoryDao get categoryDao;
   GenderDao get genderDao;
+  ReturnDao get returnDao;
+  ReturnLineDao get returnLineDao;
+  @transaction
+  Future<void> insertReturnAndLines(
+    ReturnEntity ret,
+    List<ReturnLine> lines,
+  ) async {
+    await returnDao.insertReturn(ret);
+    for (final line in lines) {
+      await returnLineDao.insertReturnLine(line);
+    }
+  }
 }
 
 Future<AppDatabase> openMobileDb(String path) async {

@@ -130,4 +130,12 @@ abstract class StockDb {
     required String startDate,
     required String endDate,
   });
+  Future<String> performReturnTransaction({
+    required String saleId,
+    required List<CartItemModel> returnedItems,
+    required double totalRefund,
+    String? reason,
+    String? createdBy,
+    bool isSynced = false,
+  });
 }

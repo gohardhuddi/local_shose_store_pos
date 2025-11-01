@@ -86,6 +86,10 @@ class _$AppDatabase extends AppDatabase {
 
   GenderDao? _genderDaoInstance;
 
+  ReturnDao? _returnDaoInstance;
+
+  ReturnLineDao? _returnLineDaoInstance;
+
   Future<sqflite.Database> open(
     String path,
     List<Migration> migrations, [
@@ -121,6 +125,10 @@ class _$AppDatabase extends AppDatabase {
             'CREATE TABLE IF NOT EXISTS `categories` (`category_id` TEXT NOT NULL, `category_name` TEXT NOT NULL, `is_active` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`category_id`))');
         await database.execute(
             'CREATE TABLE IF NOT EXISTS `genders` (`gender_id` TEXT NOT NULL, `gender_name` TEXT NOT NULL, `is_active` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`gender_id`))');
+        await database.execute(
+            'CREATE TABLE IF NOT EXISTS `returns` (`return_id` TEXT NOT NULL, `sale_id` TEXT NOT NULL, `date_time` TEXT NOT NULL, `total_refund` REAL NOT NULL, `reason` TEXT, `createdBy` TEXT, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, FOREIGN KEY (`sale_id`) REFERENCES `sales` (`sale_id`) ON UPDATE NO ACTION ON DELETE CASCADE, PRIMARY KEY (`return_id`))');
+        await database.execute(
+            'CREATE TABLE IF NOT EXISTS `return_lines` (`return_line_id` TEXT NOT NULL, `return_id` TEXT NOT NULL, `variant_id` TEXT NOT NULL, `qty` INTEGER NOT NULL, `unit_price` REAL NOT NULL, `refund_amount` REAL NOT NULL, `is_synced` INTEGER NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, FOREIGN KEY (`return_id`) REFERENCES `returns` (`return_id`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`product_variant_id`) ON UPDATE NO ACTION ON DELETE NO ACTION, PRIMARY KEY (`return_line_id`))');
         await database.execute(
             'CREATE UNIQUE INDEX `index_products_article_code` ON `products` (`article_code`)');
         await database.execute(
@@ -189,6 +197,16 @@ class _$AppDatabase extends AppDatabase {
   @override
   GenderDao get genderDao {
     return _genderDaoInstance ??= _$GenderDao(database, changeListener);
+  }
+
+  @override
+  ReturnDao get returnDao {
+    return _returnDaoInstance ??= _$ReturnDao(database, changeListener);
+  }
+
+  @override
+  ReturnLineDao get returnLineDao {
+    return _returnLineDaoInstance ??= _$ReturnLineDao(database, changeListener);
   }
 }
 
@@ -1257,5 +1275,145 @@ class _$GenderDao extends GenderDao {
   @override
   Future<void> deleteGender(Gender g) async {
     await _genderDeletionAdapter.delete(g);
+  }
+}
+
+class _$ReturnDao extends ReturnDao {
+  _$ReturnDao(
+    this.database,
+    this.changeListener,
+  )   : _queryAdapter = QueryAdapter(database),
+        _returnEntityInsertionAdapter = InsertionAdapter(
+            database,
+            'returns',
+            (ReturnEntity item) => <String, Object?>{
+                  'return_id': item.returnId,
+                  'sale_id': item.saleId,
+                  'date_time': item.dateTime,
+                  'total_refund': item.totalRefund,
+                  'reason': item.reason,
+                  'createdBy': item.createdBy,
+                  'is_synced': item.isSynced,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt
+                }),
+        _returnEntityUpdateAdapter = UpdateAdapter(
+            database,
+            'returns',
+            ['return_id'],
+            (ReturnEntity item) => <String, Object?>{
+                  'return_id': item.returnId,
+                  'sale_id': item.saleId,
+                  'date_time': item.dateTime,
+                  'total_refund': item.totalRefund,
+                  'reason': item.reason,
+                  'createdBy': item.createdBy,
+                  'is_synced': item.isSynced,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt
+                });
+
+  final sqflite.DatabaseExecutor database;
+
+  final StreamController<String> changeListener;
+
+  final QueryAdapter _queryAdapter;
+
+  final InsertionAdapter<ReturnEntity> _returnEntityInsertionAdapter;
+
+  final UpdateAdapter<ReturnEntity> _returnEntityUpdateAdapter;
+
+  @override
+  Future<List<ReturnEntity>> getAllReturns() async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM returns ORDER BY date_time DESC',
+        mapper: (Map<String, Object?> row) => ReturnEntity(
+            returnId: row['return_id'] as String,
+            saleId: row['sale_id'] as String,
+            dateTime: row['date_time'] as String,
+            totalRefund: row['total_refund'] as double,
+            reason: row['reason'] as String?,
+            createdBy: row['createdBy'] as String?,
+            isSynced: row['is_synced'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String));
+  }
+
+  @override
+  Future<List<ReturnEntity>> getUnsyncedReturns() async {
+    return _queryAdapter.queryList('SELECT * FROM returns WHERE is_synced = 0',
+        mapper: (Map<String, Object?> row) => ReturnEntity(
+            returnId: row['return_id'] as String,
+            saleId: row['sale_id'] as String,
+            dateTime: row['date_time'] as String,
+            totalRefund: row['total_refund'] as double,
+            reason: row['reason'] as String?,
+            createdBy: row['createdBy'] as String?,
+            isSynced: row['is_synced'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String));
+  }
+
+  @override
+  Future<void> insertReturn(ReturnEntity entity) async {
+    await _returnEntityInsertionAdapter.insert(
+        entity, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<int> updateReturn(ReturnEntity entity) {
+    return _returnEntityUpdateAdapter.updateAndReturnChangedRows(
+        entity, OnConflictStrategy.abort);
+  }
+}
+
+class _$ReturnLineDao extends ReturnLineDao {
+  _$ReturnLineDao(
+    this.database,
+    this.changeListener,
+  )   : _queryAdapter = QueryAdapter(database),
+        _returnLineInsertionAdapter = InsertionAdapter(
+            database,
+            'return_lines',
+            (ReturnLine item) => <String, Object?>{
+                  'return_line_id': item.returnLineId,
+                  'return_id': item.returnId,
+                  'variant_id': item.variantId,
+                  'qty': item.qty,
+                  'unit_price': item.unitPrice,
+                  'refund_amount': item.refundAmount,
+                  'is_synced': item.isSynced,
+                  'created_at': item.createdAt,
+                  'updated_at': item.updatedAt
+                });
+
+  final sqflite.DatabaseExecutor database;
+
+  final StreamController<String> changeListener;
+
+  final QueryAdapter _queryAdapter;
+
+  final InsertionAdapter<ReturnLine> _returnLineInsertionAdapter;
+
+  @override
+  Future<List<ReturnLine>> getLinesByReturnId(String returnId) async {
+    return _queryAdapter.queryList(
+        'SELECT * FROM return_lines WHERE return_id = ?1',
+        mapper: (Map<String, Object?> row) => ReturnLine(
+            returnLineId: row['return_line_id'] as String,
+            returnId: row['return_id'] as String,
+            variantId: row['variant_id'] as String,
+            qty: row['qty'] as int,
+            unitPrice: row['unit_price'] as double,
+            refundAmount: row['refund_amount'] as double,
+            isSynced: row['is_synced'] as int,
+            createdAt: row['created_at'] as String,
+            updatedAt: row['updated_at'] as String),
+        arguments: [returnId]);
+  }
+
+  @override
+  Future<void> insertReturnLine(ReturnLine line) async {
+    await _returnLineInsertionAdapter.insert(line, OnConflictStrategy.abort);
   }
 }
