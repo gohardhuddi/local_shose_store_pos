@@ -22,6 +22,7 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
     on<GetCartItemsEvent>(_onGetCartItems);
     on<SearchSalesEvent>(_onSearchSales); // 👈 ADD THIS
     on<ClearSalesSearchEvent>(_onClearSalesSearchEvent);
+    on<FilterSalesByTypeEvent>(_onFilterSalesByType);
   }
 
   List<CartItemModel> cartItems = [];
@@ -249,5 +250,39 @@ class SalesBloc extends Bloc<SalesEvents, SalesStates> {
   ) async {
     // Clear search results (return empty state for UI)
     emit(GetAllSalesSuccessState([]));
+  }
+
+  Future<void> _onFilterSalesByType(
+    FilterSalesByTypeEvent event,
+    Emitter<SalesStates> emit,
+  ) async {
+    try {
+      // Load master data if not already loaded
+      if (_allSales.isEmpty) {
+        _allSales = await _salesRepository.getAllSalesWithLines();
+      }
+
+      // Show all
+      if (event.filterType == 'all') {
+        emit(GetAllSalesSuccessState(_allSales));
+        return;
+      }
+
+      final filtered = _allSales.where((s) {
+        final hasNegativeQty = s.lines.any((line) => line.line.qty < 0);
+        final hasPositiveQty = s.lines.any((line) => line.line.qty > 0);
+
+        if (event.filterType == 'return') {
+          return hasNegativeQty && !hasPositiveQty; // pure return
+        } else if (event.filterType == 'sale') {
+          return hasPositiveQty && !hasNegativeQty; // pure sale
+        }
+        return true; // fallback (shouldn't reach)
+      }).toList();
+
+      emit(GetAllSalesSuccessState(filtered));
+    } catch (e) {
+      emit(SalesErrorState('Failed to filter sales: $e'));
+    }
   }
 }

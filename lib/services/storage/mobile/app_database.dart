@@ -27,7 +27,7 @@ part 'app_database.g.dart';
 
 // NOTE: Version 8 because we migrate inventory_movements to store SKU (TEXT) with FK to product_variants(sku)
 @Database(
-  version: 12,
+  version: 14,
   entities: [
     Product,
     ProductVariant,
@@ -70,6 +70,8 @@ Future<AppDatabase> openMobileDb(String path) async {
     migration9to10,
     migration10to11,
     migration11to12,
+    migration12to13,
+    migration13to14,
   ]).build();
 
   // ✅ Seed defaults if needed
@@ -393,5 +395,50 @@ final migration11to12 = Migration(11, 12, (db) async {
   );
   await db.execute(
     'CREATE INDEX IF NOT EXISTS idx_products_gender_id ON products(gender_id);',
+  );
+});
+
+/// ----------------------------
+/// 12 -> 13: Add returns + return_lines tables
+/// ----------------------------
+final migration12to13 = Migration(12, 13, (db) async {
+  await db.execute('PRAGMA foreign_keys = ON;');
+
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS returns (
+    return_id TEXT PRIMARY KEY,
+    sale_id TEXT NOT NULL,
+    date_time TEXT NOT NULL,
+    total_refund REAL NOT NULL,
+    reason TEXT,
+    createdBy TEXT,
+    is_synced INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  ''');
+
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS return_lines (
+    return_line_id TEXT PRIMARY KEY,
+    return_id TEXT NOT NULL,
+    variant_id TEXT NOT NULL,
+    qty REAL NOT NULL,
+    unit_price REAL NOT NULL,
+    refund_amount REAL NOT NULL,
+    is_synced INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(return_id) REFERENCES returns(return_id) ON DELETE CASCADE
+  );
+  ''');
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_return_lines_return_id ON return_lines(return_id);',
+  );
+});
+final migration13to14 = Migration(13, 14, (db) async {
+  await db.execute(
+    'ALTER TABLE sales ADD COLUMN sale_type TEXT NOT NULL DEFAULT "sale";',
   );
 });

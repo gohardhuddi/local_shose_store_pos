@@ -22,6 +22,7 @@ class SaleWithLines {
       isSynced: (json['isSynced'] as int?) ?? 0,
       dateTime: json['dateTime']?.toString() ?? '',
       createdAt: json['createdAt']?.toString() ?? '',
+      saleType: 'sale',
     );
 
     final dynamic saleLinesRaw = json['saleLines'];

@@ -15,7 +15,7 @@ class ReturnServiceLocal {
       returnedItems: items,
       totalRefund: totalRefund,
       reason: reason,
-      createdBy: createdBy,
+      createdBy: createdBy ?? "self",
       isSynced: isSynced,
     );
   }
@@ -33,7 +33,7 @@ class ReturnServiceLocal {
       returnedItems: items,
       totalRefund: totalRefund,
       reason: reason,
-      createdBy: createdBy,
+      createdBy: createdBy ?? "self",
       isSynced: isSynced,
     );
   }

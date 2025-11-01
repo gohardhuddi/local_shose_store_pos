@@ -135,7 +135,7 @@ abstract class StockDb {
     required List<CartItemModel> returnedItems,
     required double totalRefund,
     String? reason,
-    String? createdBy,
+    String createdBy,
     bool isSynced = false,
   });
 }

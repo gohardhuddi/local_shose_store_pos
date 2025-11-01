@@ -96,7 +96,7 @@ class _$AppDatabase extends AppDatabase {
     Callback? callback,
   ]) async {
     final databaseOptions = sqflite.OpenDatabaseOptions(
-      version: 12,
+      version: 14,
       onConfigure: (database) async {
         await database.execute('PRAGMA foreign_keys = ON');
         await callback?.onConfigure?.call(database);
@@ -118,7 +118,7 @@ class _$AppDatabase extends AppDatabase {
         await database.execute(
             'CREATE TABLE IF NOT EXISTS `inventory_movements` (`movement_id` TEXT NOT NULL, `product_variant_id` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `action` TEXT NOT NULL, `date_time` TEXT NOT NULL, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`movement_id`))');
         await database.execute(
-            'CREATE TABLE IF NOT EXISTS `sales` (`sale_id` TEXT NOT NULL, `date_time` TEXT NOT NULL, `customer_id` TEXT, `total_amount` REAL NOT NULL, `discount_amount` REAL NOT NULL, `final_amount` REAL NOT NULL, `payment_type` TEXT NOT NULL, `amount_paid` REAL NOT NULL, `change_returned` REAL NOT NULL, `created_by` TEXT NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`sale_id`))');
+            'CREATE TABLE IF NOT EXISTS `sales` (`sale_id` TEXT NOT NULL, `date_time` TEXT NOT NULL, `customer_id` TEXT, `total_amount` REAL NOT NULL, `discount_amount` REAL NOT NULL, `final_amount` REAL NOT NULL, `payment_type` TEXT NOT NULL, `amount_paid` REAL NOT NULL, `sale_type` TEXT NOT NULL, `change_returned` REAL NOT NULL, `created_by` TEXT NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, PRIMARY KEY (`sale_id`))');
         await database.execute(
             'CREATE TABLE IF NOT EXISTS `sale_lines` (`sale_line_id` TEXT NOT NULL, `sale_id` TEXT NOT NULL, `variant_id` TEXT NOT NULL, `qty` INTEGER NOT NULL, `unit_price` REAL NOT NULL, `line_total` REAL NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT, `is_synced` INTEGER NOT NULL, FOREIGN KEY (`sale_id`) REFERENCES `sales` (`sale_id`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`product_variant_id`) ON UPDATE NO ACTION ON DELETE RESTRICT, PRIMARY KEY (`sale_line_id`))');
         await database.execute(
@@ -724,6 +724,7 @@ class _$SaleDao extends SaleDao {
                   'final_amount': item.finalAmount,
                   'payment_type': item.paymentType,
                   'amount_paid': item.amountPaid,
+                  'sale_type': item.saleType,
                   'change_returned': item.changeReturned,
                   'created_by': item.createdBy,
                   'created_at': item.createdAt,
@@ -743,6 +744,7 @@ class _$SaleDao extends SaleDao {
                   'final_amount': item.finalAmount,
                   'payment_type': item.paymentType,
                   'amount_paid': item.amountPaid,
+                  'sale_type': item.saleType,
                   'change_returned': item.changeReturned,
                   'created_by': item.createdBy,
                   'created_at': item.createdAt,
@@ -762,6 +764,7 @@ class _$SaleDao extends SaleDao {
                   'final_amount': item.finalAmount,
                   'payment_type': item.paymentType,
                   'amount_paid': item.amountPaid,
+                  'sale_type': item.saleType,
                   'change_returned': item.changeReturned,
                   'created_by': item.createdBy,
                   'created_at': item.createdAt,
@@ -786,6 +789,7 @@ class _$SaleDao extends SaleDao {
     return _queryAdapter.queryList(
         'SELECT * FROM sales ORDER BY date_time DESC',
         mapper: (Map<String, Object?> row) => Sale(
+            saleType: row['sale_type'] as String,
             saleId: row['sale_id'] as String,
             dateTime: row['date_time'] as String,
             customerId: row['customer_id'] as String?,
@@ -805,6 +809,7 @@ class _$SaleDao extends SaleDao {
   Future<Sale?> findSaleById(String id) async {
     return _queryAdapter.query('SELECT * FROM sales WHERE sale_id = ?1',
         mapper: (Map<String, Object?> row) => Sale(
+            saleType: row['sale_type'] as String,
             saleId: row['sale_id'] as String,
             dateTime: row['date_time'] as String,
             customerId: row['customer_id'] as String?,
@@ -1282,8 +1287,7 @@ class _$ReturnDao extends ReturnDao {
   _$ReturnDao(
     this.database,
     this.changeListener,
-  )   : _queryAdapter = QueryAdapter(database),
-        _returnEntityInsertionAdapter = InsertionAdapter(
+  )   : _returnEntityInsertionAdapter = InsertionAdapter(
             database,
             'returns',
             (ReturnEntity item) => <String, Object?>{
@@ -1297,17 +1301,16 @@ class _$ReturnDao extends ReturnDao {
                   'created_at': item.createdAt,
                   'updated_at': item.updatedAt
                 }),
-        _returnEntityUpdateAdapter = UpdateAdapter(
+        _returnLineInsertionAdapter = InsertionAdapter(
             database,
-            'returns',
-            ['return_id'],
-            (ReturnEntity item) => <String, Object?>{
+            'return_lines',
+            (ReturnLine item) => <String, Object?>{
+                  'return_line_id': item.returnLineId,
                   'return_id': item.returnId,
-                  'sale_id': item.saleId,
-                  'date_time': item.dateTime,
-                  'total_refund': item.totalRefund,
-                  'reason': item.reason,
-                  'createdBy': item.createdBy,
+                  'variant_id': item.variantId,
+                  'qty': item.qty,
+                  'unit_price': item.unitPrice,
+                  'refund_amount': item.refundAmount,
                   'is_synced': item.isSynced,
                   'created_at': item.createdAt,
                   'updated_at': item.updatedAt
@@ -1317,42 +1320,9 @@ class _$ReturnDao extends ReturnDao {
 
   final StreamController<String> changeListener;
 
-  final QueryAdapter _queryAdapter;
-
   final InsertionAdapter<ReturnEntity> _returnEntityInsertionAdapter;
 
-  final UpdateAdapter<ReturnEntity> _returnEntityUpdateAdapter;
-
-  @override
-  Future<List<ReturnEntity>> getAllReturns() async {
-    return _queryAdapter.queryList(
-        'SELECT * FROM returns ORDER BY date_time DESC',
-        mapper: (Map<String, Object?> row) => ReturnEntity(
-            returnId: row['return_id'] as String,
-            saleId: row['sale_id'] as String,
-            dateTime: row['date_time'] as String,
-            totalRefund: row['total_refund'] as double,
-            reason: row['reason'] as String?,
-            createdBy: row['createdBy'] as String?,
-            isSynced: row['is_synced'] as int,
-            createdAt: row['created_at'] as String,
-            updatedAt: row['updated_at'] as String));
-  }
-
-  @override
-  Future<List<ReturnEntity>> getUnsyncedReturns() async {
-    return _queryAdapter.queryList('SELECT * FROM returns WHERE is_synced = 0',
-        mapper: (Map<String, Object?> row) => ReturnEntity(
-            returnId: row['return_id'] as String,
-            saleId: row['sale_id'] as String,
-            dateTime: row['date_time'] as String,
-            totalRefund: row['total_refund'] as double,
-            reason: row['reason'] as String?,
-            createdBy: row['createdBy'] as String?,
-            isSynced: row['is_synced'] as int,
-            createdAt: row['created_at'] as String,
-            updatedAt: row['updated_at'] as String));
-  }
+  final InsertionAdapter<ReturnLine> _returnLineInsertionAdapter;
 
   @override
   Future<void> insertReturn(ReturnEntity entity) async {
@@ -1361,9 +1331,25 @@ class _$ReturnDao extends ReturnDao {
   }
 
   @override
-  Future<int> updateReturn(ReturnEntity entity) {
-    return _returnEntityUpdateAdapter.updateAndReturnChangedRows(
-        entity, OnConflictStrategy.abort);
+  Future<void> insertReturnLine(ReturnLine line) async {
+    await _returnLineInsertionAdapter.insert(line, OnConflictStrategy.abort);
+  }
+
+  @override
+  Future<void> insertReturnAndLines(
+    ReturnEntity ret,
+    List<ReturnLine> lines,
+  ) async {
+    if (database is sqflite.Transaction) {
+      await super.insertReturnAndLines(ret, lines);
+    } else {
+      await (database as sqflite.Database)
+          .transaction<void>((transaction) async {
+        final transactionDatabase = _$AppDatabase(changeListener)
+          ..database = transaction;
+        await transactionDatabase.returnDao.insertReturnAndLines(ret, lines);
+      });
+    }
   }
 }
 

@@ -5,7 +5,6 @@ import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/services/storage/stock_db.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:uuid/uuid.dart';
 
 import '../../models/cart_model.dart';
@@ -634,6 +633,7 @@ class StockDbFloor implements StockDb {
         isSynced: isSynced ? 1 : 0,
         dateTime: now,
         createdAt: now,
+        saleType: "sale",
       );
       await db.saleDao.insertSale(sale);
 
@@ -709,22 +709,31 @@ class StockDbFloor implements StockDb {
     try {
       final result = await db.database.rawQuery(
         '''
-      SELECT 
-        SUM(final_amount * 1.0) AS totalSales,
-        COUNT(sale_id) AS totalOrders,
-        (
-          SELECT SUM(qty)
-          FROM sale_lines
-          WHERE sale_id IN (
-            SELECT sale_id FROM sales
-            WHERE date(date_time) BETWEEN ? AND ?
-          )
-        ) AS itemsSold
-      FROM sales
-      WHERE date(date_time) BETWEEN ? AND ?
-      ''',
-        [startDate, endDate, startDate, endDate],
+      SELECT
+        SUM(
+          CASE 
+            WHEN s.sale_type = 'return' THEN -ABS(s.final_amount)
+            ELSE s.final_amount
+          END
+        ) AS total_sales,
+        COUNT(
+          DISTINCT CASE 
+            WHEN s.sale_type = 'sale' THEN s.sale_id
+          END
+        ) AS total_orders,
+        SUM(
+          CASE
+            WHEN s.sale_type = 'return' THEN -ABS(sl.qty)
+            ELSE sl.qty
+          END
+        ) AS items_sold
+      FROM sales s
+      LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
+      WHERE date(s.date_time) BETWEEN ? AND ?;
+    ''',
+        [startDate, endDate],
       );
+
       debugPrint(result.toString());
       return result;
     } catch (e, st) {
@@ -815,46 +824,81 @@ class StockDbFloor implements StockDb {
     final now = DateTime.now().toIso8601String();
     final returnId = const Uuid().v4();
 
-    // ✅ 1. Build parent record
-    final returnEntity = ReturnEntity(
-      returnId: returnId,
-      saleId: saleId,
-      dateTime: now,
-      totalRefund: totalRefund,
-      reason: reason,
-      createdBy: createdBy,
-      isSynced: isSynced ? 1 : 0,
-      createdAt: now,
-      updatedAt: now,
-    );
+    try {
+      // STEP 1️⃣ — Insert a "Negative Sale" Record (refund)
+      final negativeSaleId = const Uuid().v4();
+      final negativeSale = Sale(
+        saleId: negativeSaleId,
+        totalAmount: -totalRefund,
+        // negative to represent refund
+        discountAmount: 0.0,
+        finalAmount: -totalRefund,
+        paymentType: 'refund',
+        // or match original sale
+        amountPaid: -totalRefund,
+        changeReturned: 0,
+        createdBy: createdBy ?? "self",
+        isSynced: isSynced ? 1 : 0,
+        dateTime: now,
+        createdAt: now,
+        saleType: 'return',
+      );
+      await db.saleDao.insertSale(negativeSale);
 
-    // ✅ 2. Build all return line objects
-    final returnLines = returnedItems.map((item) {
-      return ReturnLine(
-        returnLineId: const Uuid().v4(),
+      // STEP 2️⃣ — Add Negative Sale Lines (same as Sale but negative qty/price)
+      for (final item in returnedItems) {
+        final saleLineId = const Uuid().v4();
+        final saleLine = SaleLine(
+          saleLineId: saleLineId,
+          saleId: negativeSaleId,
+          variantId: item.variant.variantId,
+          qty: -item.cartQty,
+          // negative quantity
+          unitPrice: item.variant.salePrice,
+          lineTotal: -item.cartQty * item.variant.salePrice,
+          createdAt: now,
+          isSynced: isSynced ? 1 : 0,
+        );
+        await db.saleLineDao.insertSaleLine(saleLine);
+      }
+
+      // STEP 3️⃣ — Create Return Record
+      final returnEntity = ReturnEntity(
         returnId: returnId,
-        variantId: item.variant.variantId,
-        qty: item.cartQty,
-        unitPrice: item.variant.salePrice,
-        refundAmount: item.variant.salePrice * item.cartQty,
+        saleId: saleId,
+        dateTime: now,
+        totalRefund: totalRefund,
+        reason: reason,
+        createdBy: createdBy,
         isSynced: isSynced ? 1 : 0,
         createdAt: now,
         updatedAt: now,
       );
-    }).toList();
+      await db.returnDao.insertReturn(returnEntity);
 
-    // ✅ 3. Start SQL transaction
-    final rawDb = db.database as sqflite.Database;
-    await rawDb.transaction((txn) async {
-      // Step A — Insert return + lines in one atomic Floor transaction
-      await db.insertReturnAndLines(returnEntity, returnLines);
-
-      // Step B — Update inventory quantities & log movements
+      // STEP 4️⃣ — Create Return Line Entries + Update Inventory
       for (final item in returnedItems) {
+        // Insert Return Line
+        final returnLine = ReturnLine(
+          returnLineId: const Uuid().v4(),
+          returnId: returnId,
+          variantId: item.variant.variantId,
+          qty: item.cartQty,
+          unitPrice: item.variant.salePrice,
+          refundAmount: item.variant.salePrice * item.cartQty,
+          isSynced: isSynced ? 1 : 0,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await db.returnLineDao.insertReturnLine(returnLine);
+
+        // Update Inventory (stock IN for returned items)
         final variants = await db.variantDao.findByVariantId(
           item.variant.variantId,
         );
-        if (variants.isEmpty) throw StateError('Variant not found');
+        if (variants.isEmpty) {
+          throw StateError('Variant not found: ${item.variant.variantId}');
+        }
 
         final variant = variants.first;
         final newQty = variant.quantity + item.cartQty;
@@ -866,18 +910,27 @@ class StockDbFloor implements StockDb {
         );
         await db.variantDao.updateVariant(updatedVariant);
 
-        // Step C — Add inventory movement
-        await addInventoryMovement(
+        // Log inventory movement
+        final movement = InventoryMovement(
           movementId: const Uuid().v4(),
           productVariantId: item.variant.variantId,
           quantity: item.cartQty,
           action: 'return_in',
+          // opposite of sale_out
           dateTime: now,
-          isSynced: isSynced,
+          isSynced: isSynced ? 1 : 0,
         );
+        await db.movementDao.insertMovement(movement);
       }
-    });
 
-    return returnId;
+      return returnId;
+    } catch (e) {
+      // Rollback logic (optional, similar to your sale rollback)
+      try {
+        await db.saleDao.clearSales();
+        await db.saleLineDao.clearLinesForSale(saleId);
+      } catch (_) {}
+      rethrow;
+    }
   }
 }

@@ -17,6 +17,7 @@ class ViewSalesScreen extends StatefulWidget {
 class _ViewSalesScreenState extends State<ViewSalesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedFilter = 'all';
 
   @override
   void initState() {
@@ -72,6 +73,44 @@ class _ViewSalesScreenState extends State<ViewSalesScreen> {
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surfaceVariant,
               ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('All'),
+                  selected: _selectedFilter == 'all',
+                  onSelected: (_) {
+                    setState(() => _selectedFilter = 'all');
+                    context.read<SalesBloc>().add(
+                      FilterSalesByTypeEvent('all'),
+                    );
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Sales'),
+                  selected: _selectedFilter == 'sale',
+                  onSelected: (_) {
+                    setState(() => _selectedFilter = 'sale');
+                    context.read<SalesBloc>().add(
+                      FilterSalesByTypeEvent('sale'),
+                    );
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Returns'),
+                  selected: _selectedFilter == 'return',
+                  onSelected: (_) {
+                    setState(() => _selectedFilter = 'return');
+                    context.read<SalesBloc>().add(
+                      FilterSalesByTypeEvent('return'),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
 

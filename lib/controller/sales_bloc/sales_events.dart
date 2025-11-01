@@ -148,3 +148,11 @@ class SearchSalesEvent extends SalesEvents {
 }
 
 class ClearSalesSearchEvent extends SalesEvents {}
+
+class FilterSalesByTypeEvent extends SalesEvents {
+  final String filterType; // 'all', 'sale', 'return'
+  FilterSalesByTypeEvent(this.filterType);
+
+  @override
+  List<Object> get props => [filterType];
+}
