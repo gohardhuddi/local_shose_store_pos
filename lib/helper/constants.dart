@@ -23,6 +23,7 @@ class CustomStrings {
   static const cartScreenHeading = "Anarkali Shoes Cart";
   static const inventoryManagementSystem = "Inventory Management System";
   static const salesRecord = "Sales Record";
+  static const returnSale = "Return Sales";
 
   // Navigation
   static const sale = "Sale";
@@ -64,7 +65,7 @@ class CustomStrings {
   static const subtract = "Subtract";
 
   // View Stock Screen
-  static const stockTitle = "Stock";
+  static const stockTitle = "Stocks";
   static const searchHint = "Search brand, article, SKU, color, size…";
   static const noStockYet = "No stock yet. Add some!";
   static const noStock = "No stock";
@@ -76,6 +77,9 @@ class CustomStrings {
   static const delete = "Delete";
   static const edit = "Edit";
   static const tapped = "Tapped";
+  static const price = "price";
+  static const lineTotal = "Line Total";
+  static const noSales = "No sales recorded yet.";
 
   // Colors
   static const black = "Black";
@@ -103,9 +107,16 @@ class CustomStrings {
   static const sell = "Sell:";
   static const qtyTotal = "Qty";
   static const variants = "Variants";
+  static const salesHistory = "Sales History";
+  static const searchByDate = "Search by SKU, Amount, or Date (DD-MM-YYY)";
+  static const saleID = "Sale ID:";
+  static const total = "Total:";
+  static const currency = "Rs";
 
   // Success/Error Messages
   static const stockAddedSuccessfully = "Stock Added Successfully";
+  static const productSyncedSuccessfully = "Products Synced Successfully";
+  static const productSyncedError = "Products Sync Error";
   static const variantDeletedSuccessfully = "Variant Deleted Successfully";
   static const movementAddedSuccessfully = "Movement Added Successfully";
   static const itemAddedToCartSuccessfully = "Item Added to Cart Successfully";
@@ -165,6 +176,8 @@ class CustomStrings {
   static const forgotPassword = "Forgot Password";
   static const pleaseEnterEmail =
       "Please enter the email address you use to create your account confirmation link will be sent to you shortly";
+
+  static String dbname = 'shoe_pos_floor.db';
 }
 
 class CustomColors {

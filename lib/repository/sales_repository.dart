@@ -50,6 +50,56 @@ class SalesRepository {
 
   Future<List<SaleWithLines>> getAllSalesWithLines() async {
     final rows = await _salesServiceLocal.getAllSalesWithLines();
+    print(rows);
+
+    final Map<String, Map<String, dynamic>> grouped = {};
+
+    for (final row in rows) {
+      final saleId = row['saleId'].toString();
+
+      if (!grouped.containsKey(saleId)) {
+        grouped[saleId] = {
+          'saleId': row['saleId'],
+          'totalAmount': row['totalAmount'],
+          'discountAmount': row['discountAmount'],
+          'finalAmount': row['finalAmount'],
+          'paymentType': row['paymentType'],
+          'amountPaid': row['amountPaid'],
+          'changeReturned': row['changeReturned'],
+          'createdBy': row['createdBy'],
+          'isSynced': row['isSynced'],
+          'dateTime': row['dateTime'],
+          'createdAt': row['createdAt'],
+          // CORRECT: initialize saleLines as REAL LIST
+          'saleLines': [],
+        };
+      }
+
+      grouped[saleId]!['saleLines'].add({
+        'saleLineId': row['saleLineId'],
+        'variantId': row['variantId'],
+        'sku': row['sku'],
+        'brand': row['brand'],
+        'articleCode': row['articleCode'],
+        'sizeEu': row['sizeEu'],
+        'colorName': row['colorName'],
+        'qty': row['qty'],
+        'unitPrice': row['unitPrice'],
+        'lineTotal': row['lineTotal'],
+      });
+    }
+
+    return grouped.values.map((g) => SaleWithLines.fromJson(g)).toList();
+  }
+
+  Future<List<SaleWithLines>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  }) async {
+    final rows = await _salesServiceLocal.getSalesByDateRange(
+      startDate: startDate,
+      endDate: endDate,
+    );
     return rows.map((row) => SaleWithLines.fromJson(row)).toList();
   }
 }

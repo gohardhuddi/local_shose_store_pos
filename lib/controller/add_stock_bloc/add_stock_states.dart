@@ -12,14 +12,16 @@ class AddStockInitialState extends AddStockStates {}
 class AddStockLoadingState extends AddStockStates {}
 
 class AddStockSuccessState extends AddStockStates {
-  final String successMessage = CustomStrings.stockAddedSuccessfully;
+  final String successMessage;
+  AddStockSuccessState({required this.successMessage});
 
   @override
   List<Object> get props => [successMessage];
 }
 
 class AddStockErrorState extends AddStockStates {
-  final String error = CustomStrings.somethingWentWrong;
+  final String error;
+  AddStockErrorState({required this.error});
 
   @override
   List<Object> get props => [error];
@@ -46,4 +48,16 @@ class MovementsSuccessState extends AddStockStates {
 
   @override
   List<Object> get props => [success];
+}
+
+class GetCategoriesAndGendersSuccessState extends AddStockStates {
+  final dynamic genders;
+  final dynamic categories;
+  GetCategoriesAndGendersSuccessState({
+    required this.genders,
+    required this.categories,
+  });
+
+  @override
+  List<Object> get props => [genders, categories];
 }

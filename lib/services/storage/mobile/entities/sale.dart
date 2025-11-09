@@ -32,6 +32,8 @@ class Sale {
 
   @ColumnInfo(name: 'amount_paid')
   final double amountPaid;
+  @ColumnInfo(name: 'sale_type')
+  final String saleType;
 
   @ColumnInfo(name: 'change_returned')
   final double changeReturned;
@@ -51,6 +53,7 @@ class Sale {
   final int isSynced;
 
   const Sale({
+    required this.saleType,
     required this.saleId,
     required this.dateTime,
     this.customerId,
@@ -95,6 +98,7 @@ class Sale {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isSynced: isSynced ?? this.isSynced,
+      saleType: this.saleType,
     );
   }
 }

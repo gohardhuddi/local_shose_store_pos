@@ -12,8 +12,9 @@ class AddStockServiceRemote {
   Future<Response> uploadCatalogList(List<Map<String, dynamic>> catalog) async {
     try {
       final body = jsonEncode(catalog);
-      final String url =
-          "${Global.baseUrl}Stock/catalog"; // you asked to explicitly JSON-encode
+      print(body);
+      final String url = "${Global.baseUrl}Stock/sync/products";
+      print(url); // you asked to explicitly JSON-encode
       final Response response = await networkService.postRequest(
         body: body,
         url: url,
@@ -30,10 +31,4 @@ class AddStockServiceRemote {
       throw Exception(e);
     }
   }
-
-  // /// Convenience if you want to send one product at a time.
-  // Future<Response> uploadSingle(Map<String, dynamic> product) async {
-  //   final body = jsonEncode(product);
-  //   return await _dio.post(_url, data: body);
-  // }
 }

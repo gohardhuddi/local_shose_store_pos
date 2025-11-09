@@ -42,11 +42,15 @@ class StockServiceLocal {
     required String purchasePrice,
     required String suggestedSalePrice,
     required bool isEdit,
+    required String category,
+    required String gender,
   }) async {
     final productId = await stockDb.upsertProduct(
       brand: _normStr(brand),
       articleCode: _normUpper(articleCode),
       articleName: _normStr(articleName),
+      category: category,
+      gender: gender,
     );
 
     await stockDb.upsertVariant(
@@ -190,5 +194,13 @@ class StockServiceLocal {
 
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) {
     return stockDb.deleteVariantById(variantId, hard: hard);
+  }
+
+  Future<dynamic> getCategoriesAndGendersService() async {
+    return stockDb.getCategoriesAndGenders();
+  }
+
+  Future<dynamic> updateSyncedProducts(List<dynamic> mapedList) async {
+    return stockDb.updateSyncedProducts(mapedList: mapedList);
   }
 }

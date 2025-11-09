@@ -224,6 +224,8 @@ class StockDbWeb implements StockDb {
     required String brand,
     required String articleCode,
     String? articleName,
+    required String category,
+    required String gender,
   }) async {
     final finder = Finder(filter: Filter.equals('article_code', articleCode));
     final now = DateTime.now().toIso8601String();
@@ -736,6 +738,40 @@ class StockDbWeb implements StockDb {
   @override
   Future<List<Map<String, Object?>>> getAllSales() {
     // TODO: implement getAllSales
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  }) {
+    // TODO: implement getSalesByDateRange
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<String> performReturnTransaction({
+    required String saleId,
+    required List<CartItemModel> returnedItems,
+    required double totalRefund,
+    String? reason,
+    String? createdBy,
+    bool isSynced = false,
+  }) {
+    // TODO: implement performReturnTransaction
+    throw UnimplementedError();
+  }
+
+  @override
+  Future getCategoriesAndGenders() {
+    // TODO: implement getCategoriesAndGenders
+    throw UnimplementedError();
+  }
+
+  @override
+  Future updateSyncedProducts({required List<dynamic> mapedList}) {
+    // TODO: implement updateSyncedProducts
     throw UnimplementedError();
   }
 }

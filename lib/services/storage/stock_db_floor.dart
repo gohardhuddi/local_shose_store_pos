@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/services/storage/stock_db.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +12,8 @@ import 'mobile/app_database.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
 import 'mobile/entities/products.dart';
+import 'mobile/entities/return_entity.dart';
+import 'mobile/entities/return_line.dart';
 import 'mobile/entities/sale.dart';
 import 'mobile/entities/sale_line.dart';
 
@@ -22,8 +25,9 @@ class StockDbFloor implements StockDb {
   @override
   Future<void> init() async {
     final dir = await getApplicationDocumentsDirectory();
-    final path = join(dir.path, 'shoe_pos_floor.db');
+    final path = join(dir.path, CustomStrings.dbname);
     _db = await openMobileDb(path);
+    print(path);
   }
 
   // -------------------------
@@ -34,26 +38,40 @@ class StockDbFloor implements StockDb {
     required String brand,
     required String articleCode,
     String? articleName,
+    required String category,
+    required String gender,
   }) async {
     final now = DateTime.now().toIso8601String();
 
-    // Check if product exists
-    final existing = await db.productDao.findByArticleCode(articleCode);
+    // --- Ensure Category Exists ---
+    final existingCategory = await db.categoryDao.findById(category.trim());
+    String? categoryId = existingCategory?.categoryId;
 
-    if (existing != null) {
-      // Update existing product
-      final updated = existing.copyWith(
+    // --- Ensure Gender Exists ---
+    final existingGender = await db.genderDao.findById(gender.trim());
+    String? genderId;
+
+    genderId = existingGender?.genderId;
+
+    // --- Check if Product Already Exists ---
+    final existingProduct = await db.productDao.findByArticleCode(articleCode);
+
+    if (existingProduct != null) {
+      // Update existing product with new info + category/gender
+      final updated = existingProduct.copyWith(
         brand: brand,
         articleName: articleName,
+        categoryId: categoryId,
+        genderId: genderId,
         updatedAt: now,
         isActive: 1,
         isSynced: 0,
       );
       await db.productDao.updateProduct(updated);
-      return existing.id.toString();
+      return existingProduct.id!;
     }
 
-    // Create new product
+    // --- Create New Product ---
     final newProductID = const Uuid().v4();
     final product = Product(
       id: newProductID,
@@ -64,6 +82,8 @@ class StockDbFloor implements StockDb {
       isSynced: 0,
       createdAt: now,
       updatedAt: now,
+      categoryId: categoryId,
+      genderId: genderId,
     );
 
     await db.productDao.insertProduct(product);
@@ -381,6 +401,8 @@ class StockDbFloor implements StockDb {
               'is_synced': p.isSynced,
               'created_at': p.createdAt,
               'updated_at': p.updatedAt,
+              'category_id': p.categoryId,
+              'gender_id': p.genderId,
             },
           )
           .toList(),
@@ -585,6 +607,7 @@ class StockDbFloor implements StockDb {
         isSynced: isSynced ? 1 : 0,
         dateTime: now,
         createdAt: now,
+        saleType: "sale",
       );
       await db.saleDao.insertSale(sale);
 
@@ -653,7 +676,6 @@ class StockDbFloor implements StockDb {
   }
 
   @override
-  @override
   Future<List<Map<String, Object?>>> getSalesSummery({
     required String startDate,
     required String endDate,
@@ -661,22 +683,31 @@ class StockDbFloor implements StockDb {
     try {
       final result = await db.database.rawQuery(
         '''
-      SELECT 
-        SUM(final_amount * 1.0) AS totalSales,
-        COUNT(sale_id) AS totalOrders,
-        (
-          SELECT SUM(qty)
-          FROM sale_lines
-          WHERE sale_id IN (
-            SELECT sale_id FROM sales
-            WHERE date(date_time) BETWEEN ? AND ?
-          )
-        ) AS itemsSold
-      FROM sales
-      WHERE date(date_time) BETWEEN ? AND ?
-      ''',
-        [startDate, endDate, startDate, endDate],
+      SELECT
+        SUM(
+          CASE 
+            WHEN s.sale_type = 'return' THEN -ABS(s.final_amount)
+            ELSE s.final_amount
+          END
+        ) AS total_sales,
+        COUNT(
+          DISTINCT CASE 
+            WHEN s.sale_type = 'sale' THEN s.sale_id
+          END
+        ) AS total_orders,
+        SUM(
+          CASE
+            WHEN s.sale_type = 'return' THEN -ABS(sl.qty)
+            ELSE sl.qty
+          END
+        ) AS items_sold
+      FROM sales s
+      LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
+      WHERE date(s.date_time) BETWEEN ? AND ?;
+    ''',
+        [startDate, endDate],
       );
+
       debugPrint(result.toString());
       return result;
     } catch (e, st) {
@@ -687,6 +718,37 @@ class StockDbFloor implements StockDb {
   }
 
   @override
+  Future<List<Map<String, Object?>>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  }) async {
+    return await db.database.rawQuery(
+      '''
+    SELECT 
+      s.sale_id AS saleId,
+      s.total_amount AS totalAmount,
+      s.date_time AS dateTime,
+      json_group_array(
+        json_object(
+          'saleLineId', sl.sale_line_id,
+          'variantId', sl.variant_id,
+          'sku', v.sku,
+          'qty', sl.qty,
+          'unitPrice', sl.unit_price,
+          'lineTotal', sl.line_total
+        )
+      ) AS saleLines
+    FROM sales s
+    LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
+    LEFT JOIN product_variants v ON v.product_variant_id = sl.variant_id
+    WHERE date(s.date_time) BETWEEN ? AND ?
+    GROUP BY s.sale_id
+    ORDER BY s.date_time DESC;
+  ''',
+      [startDate, endDate],
+    );
+  }
+
   @override
   Future<List<Map<String, Object?>>> getAllSales() async {
     try {
@@ -699,20 +761,20 @@ class StockDbFloor implements StockDb {
         s.amount_paid AS amountPaid,
         s.change_returned AS changeReturned,
         s.date_time AS dateTime,
-        json_group_array(
-          json_object(
-            'saleLineId', sl.sale_line_id,
-            'variantId', sl.variant_id,
-            'sku', v.sku,
-            'qty', sl.qty,
-            'unitPrice', sl.unit_price,
-            'lineTotal', sl.line_total
-          )
-        ) AS saleLines
+        sl.sale_line_id AS saleLineId,
+        sl.variant_id AS variantId,
+        v.sku AS sku,
+        p.brand AS brand,
+        p.article_code AS articleCode,
+        v.size_eu AS sizeEu,
+        v.color_name AS colorName,
+        sl.qty AS qty,
+        sl.unit_price AS unitPrice,
+        sl.line_total AS lineTotal
       FROM sales s
       LEFT JOIN sale_lines sl ON s.sale_id = sl.sale_id
       LEFT JOIN product_variants v ON v.product_variant_id = sl.variant_id
-      GROUP BY s.sale_id
+      LEFT JOIN products p ON p.product_id = v.product_id
       ORDER BY s.date_time DESC;
     ''');
 
@@ -722,5 +784,142 @@ class StockDbFloor implements StockDb {
       debugPrintStack(stackTrace: st);
       rethrow;
     }
+  }
+
+  @override
+  Future<String> performReturnTransaction({
+    required String saleId,
+    required List<CartItemModel> returnedItems,
+    required double totalRefund,
+    String? reason,
+    String? createdBy,
+    bool isSynced = false,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final returnId = const Uuid().v4();
+
+    try {
+      // STEP 1️⃣ — Insert a "Negative Sale" Record (refund)
+      final negativeSaleId = const Uuid().v4();
+      final negativeSale = Sale(
+        saleId: negativeSaleId,
+        totalAmount: -totalRefund,
+        // negative to represent refund
+        discountAmount: 0.0,
+        finalAmount: -totalRefund,
+        paymentType: 'refund',
+        // or match original sale
+        amountPaid: -totalRefund,
+        changeReturned: 0,
+        createdBy: createdBy ?? "self",
+        isSynced: isSynced ? 1 : 0,
+        dateTime: now,
+        createdAt: now,
+        saleType: 'return',
+      );
+      await db.saleDao.insertSale(negativeSale);
+
+      // STEP 2️⃣ — Add Negative Sale Lines (same as Sale but negative qty/price)
+      for (final item in returnedItems) {
+        final saleLineId = const Uuid().v4();
+        final saleLine = SaleLine(
+          saleLineId: saleLineId,
+          saleId: negativeSaleId,
+          variantId: item.variant.variantId,
+          qty: -item.cartQty,
+          // negative quantity
+          unitPrice: item.variant.salePrice,
+          lineTotal: -item.cartQty * item.variant.salePrice,
+          createdAt: now,
+          isSynced: isSynced ? 1 : 0,
+        );
+        await db.saleLineDao.insertSaleLine(saleLine);
+      }
+
+      // STEP 3️⃣ — Create Return Record
+      final returnEntity = ReturnEntity(
+        returnId: returnId,
+        saleId: saleId,
+        dateTime: now,
+        totalRefund: totalRefund,
+        reason: reason,
+        createdBy: createdBy,
+        isSynced: isSynced ? 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await db.returnDao.insertReturn(returnEntity);
+
+      // STEP 4️⃣ — Create Return Line Entries + Update Inventory
+      for (final item in returnedItems) {
+        // Insert Return Line
+        final returnLine = ReturnLine(
+          returnLineId: const Uuid().v4(),
+          returnId: returnId,
+          variantId: item.variant.variantId,
+          qty: item.cartQty,
+          unitPrice: item.variant.salePrice,
+          refundAmount: item.variant.salePrice * item.cartQty,
+          isSynced: isSynced ? 1 : 0,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await db.returnLineDao.insertReturnLine(returnLine);
+
+        // Update Inventory (stock IN for returned items)
+        final variants = await db.variantDao.findByVariantId(
+          item.variant.variantId,
+        );
+        if (variants.isEmpty) {
+          throw StateError('Variant not found: ${item.variant.variantId}');
+        }
+
+        final variant = variants.first;
+        final newQty = variant.quantity + item.cartQty;
+
+        final updatedVariant = variant.copyWith(
+          quantity: newQty,
+          updatedAt: now,
+          isSynced: 0,
+        );
+        await db.variantDao.updateVariant(updatedVariant);
+
+        // Log inventory movement
+        final movement = InventoryMovement(
+          movementId: const Uuid().v4(),
+          productVariantId: item.variant.variantId,
+          quantity: item.cartQty,
+          action: 'return_in',
+          // opposite of sale_out
+          dateTime: now,
+          isSynced: isSynced ? 1 : 0,
+        );
+        await db.movementDao.insertMovement(movement);
+      }
+
+      return returnId;
+    } catch (e) {
+      // Rollback logic (optional, similar to your sale rollback)
+      try {
+        await db.saleDao.clearSales();
+        await db.saleLineDao.clearLinesForSale(saleId);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  @override
+  Future getCategoriesAndGenders() async {
+    final categories = await db.categoryDao.findActive();
+    final genders = await _db?.genderDao.findActive();
+    return {"categories": categories, "genders": genders};
+  }
+
+  @override
+  Future<void> updateSyncedProducts({required List<dynamic> mapedList}) async {
+    for (final id in mapedList) {
+      await db.productDao.markSynced(id);
+    }
+    ;
   }
 }

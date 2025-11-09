@@ -68,4 +68,25 @@ class SaleServiceLocal {
       rethrow; // rethrow to let upper layer (like BLoC) show user message
     }
   }
+
+  Future<List<Map<String, Object?>>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  }) async {
+    try {
+      // ✅ Use the single atomic transaction in StockDb
+      final salesSummery = await stockDb.getSalesByDateRange(
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      // No need to insert sale lines here — already done inside performSaleTransaction
+      return salesSummery;
+    } catch (e, st) {
+      // Optional: Log or handle rollback errors gracefully
+      print('❌ Sale summery failed: $e');
+      print(st);
+      rethrow; // rethrow to let upper layer (like BLoC) show user message
+    }
+  }
 }

@@ -8,9 +8,9 @@ class SalesSummaryQuery {
   /// Factory method to create from raw query result
   factory SalesSummaryQuery.fromMap(Map<String, Object?> map) {
     return SalesSummaryQuery(
-      (map['totalSales'] as num?)?.toDouble() ?? 0.0,
-      (map['totalOrders'] as num?)?.toInt() ?? 0,
-      (map['itemsSold'] as num?)?.toInt() ?? 0,
+      (map['total_sales'] as num?)?.toDouble() ?? 0.0,
+      (map['total_orders'] as num?)?.toInt() ?? 0,
+      (map['items_sold'] as num?)?.toInt() ?? 0,
     );
   }
 

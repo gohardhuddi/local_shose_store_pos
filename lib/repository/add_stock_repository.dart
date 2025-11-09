@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:local_shoes_store_pos/models/dto/upload_stock_dto.dart';
 import 'package:local_shoes_store_pos/services/stock/add_stock_service_local.dart';
 import 'package:local_shoes_store_pos/services/stock/add_stock_service_remote.dart';
 
@@ -28,6 +26,8 @@ class AddStockRepository {
     required String purchasePrice,
     required String suggestedSalePrice,
     required bool isEdit,
+    required String category,
+    required String gender,
   }) {
     return _stockServiceLocal.addStockToDbService(
       brand: brand,
@@ -40,6 +40,8 @@ class AddStockRepository {
       purchasePrice: purchasePrice,
       suggestedSalePrice: suggestedSalePrice,
       isEdit: isEdit,
+      category: category,
+      gender: gender,
     );
   }
 
@@ -171,43 +173,35 @@ class AddStockRepository {
   Future<List<Map<String, dynamic>>> mapUnsyncedToBackend(
     Map<String, dynamic> unsynced,
   ) async {
-    if (kDebugMode) {
-      print(jsonEncode(unsynced));
-    }
+    final products = (unsynced['products'] as List? ?? [])
+        .map<Map<String, dynamic>>((e) {
+          final p = Map<String, dynamic>.from(e as Map);
 
-    final products = (unsynced['products'] as List? ?? const [])
-        .cast<Map>()
-        .map((e) => Map<String, dynamic>.from(e as Map))
+          return {
+            'ProductId': p['product_id'],
+            'Brand': p['brand'],
+            'ArticleCode': p['article_code'],
+            'ArticleName': p['article_name'],
+            'Notes': p['notes'],
+            'IsActive': (p['is_active'] == 1 || p['is_active'] == true),
+            'IsSynced': (p['is_synced'] == 1 || p['is_synced'] == true),
+            'CreatedAt': p['created_at'],
+            'UpdatedAt': p['updated_at'],
+            'CategoryId': p['category_id'],
+            'GenderId': p['gender_id'],
+          };
+        })
         .toList();
 
-    final variants = (unsynced['variants'] as List? ?? const [])
-        .cast<Map>()
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-
-    final productDtos = ProductDto.buildFromLists(
-      products: products,
-      variants: variants,
-    );
-
-    return productDtos.map((dto) => dto.toJson()).toList();
+    print('📦 Ready to POST (C# PascalCase): ${jsonEncode(products)}');
+    return products;
   }
 
-  // Future<String> addStockMovementToDb({
-  //   required String movementId,
-  //   required String productCodeSku,
-  //   required StockMovementType movementType,
-  //   required String quantity,
-  //   required String dateTimeIso,
-  //   required bool isSynced,
-  // }) {
-  //   return _stockServiceLocal.addStockMovement(
-  //     movementId: movementId,
-  //     productVariantId: productCodeSku,
-  //     movementType: movementType,
-  //     quantity: quantity,
-  //     dateTimeIso: dateTimeIso,
-  //     isSynced: isSynced,
-  //   );
-  // }
+  Future<dynamic> getCategoriesAndGendersRepo() async {
+    return _stockServiceLocal.getCategoriesAndGendersService();
+  }
+
+  Future<dynamic> updateSyncedProducts(dynamic mapedList) {
+    return _stockServiceLocal.updateSyncedProducts(mapedList);
+  }
 }

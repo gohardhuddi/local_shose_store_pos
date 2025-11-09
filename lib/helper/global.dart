@@ -7,7 +7,7 @@ GetIt getIt = GetIt.instance;
 class Global {
   static final GlobalKey<ScaffoldMessengerState> appScaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
-  static const String host = 'localhost';
+  static const String host = '0.0.0.0';
   static const int port = 5245;
   static const String baseUrl = 'http://$host:$port/api/';
   static void setup() {
@@ -15,8 +15,8 @@ class Global {
     getIt.registerLazySingleton<Dio>(() {
       final dio = Dio();
 
-      dio.options.connectTimeout = Duration(seconds: 5); // 5 seconds
-      dio.options.receiveTimeout = Duration(seconds: 5);
+      dio.options.connectTimeout = Duration(seconds: 15); // 5 seconds
+      dio.options.receiveTimeout = Duration(seconds: 15);
       dio.options.headers['Content-Type'] = 'application/json';
 
       return dio;

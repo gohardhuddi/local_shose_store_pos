@@ -1,13 +1,15 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:local_shoes_store_pos/helper/constants.dart';
 import 'package:local_shoes_store_pos/views/pos/pos_home_screen.dart';
 import 'package:local_shoes_store_pos/views/pos/view_sales.dart';
+import 'package:local_shoes_store_pos/views/return/return_home_Screen.dart';
+import 'package:local_shoes_store_pos/views/settings_screen.dart';
 import 'package:local_shoes_store_pos/views/view_stock_screen.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
-import 'more_view.dart';
+import '../helper/constants.dart';
+import 'more_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,12 +22,40 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PersistentTabController _controller;
   String _appBarTitle = CustomStrings.saleScreenHeading;
   int _selectedIndex = 0;
+  bool _wasDesktop = false;
 
   @override
   void initState() {
     super.initState();
     _controller = PersistentTabController(initialIndex: 0);
     _controller.addListener(_updateTitle);
+  }
+
+  @override
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final isNowDesktop = _isDesktopLayout;
+
+    // Initialize on first call
+    if (_wasDesktop == false && _selectedIndex == 0) {
+      _wasDesktop = isNowDesktop;
+      return;
+    }
+
+    // Detect layout switch (desktop ↔ mobile)
+    if (_wasDesktop != isNowDesktop) {
+      _wasDesktop = isNowDesktop;
+
+      if (!isNowDesktop && _selectedIndex >= _screensMobile.length) {
+        setState(() {
+          _selectedIndex = 3;
+          _controller.index = 3;
+          _updateTitle();
+        });
+      }
+    }
   }
 
   void _updateTitle() {
@@ -51,18 +81,19 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<Widget> get _screensMobile => const [
+  List<Widget> get _screensMobile => [
     POSHomeScreen(),
     ViewStockScreen(),
-    Center(child: Text('Profile Page')),
+    ReturnHomeScreen(),
     MoreScreen(),
   ];
-  List<Widget> get _screensDesktop => const [
+  List<Widget> get _screensDesktop => [
     POSHomeScreen(),
     ViewStockScreen(),
-    Center(child: Text('Profile Page')),
-    MoreScreen(),
+
+    ReturnHomeScreen(),
     ViewSalesScreen(),
+    SettingsScreen(),
   ];
 
   List<PersistentBottomNavBarItem> _navItems(BuildContext context) {
@@ -84,8 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
         inactiveColorPrimary: inactive,
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(CupertinoIcons.person),
-        title: CustomStrings.profilePage,
+        icon: Icon(Icons.keyboard_return_rounded),
+        title: CustomStrings.returnSale,
         activeColorPrimary: active,
         inactiveColorPrimary: inactive,
       ),
@@ -105,23 +136,25 @@ class _HomeScreenState extends State<HomeScreen> {
         theme.colorScheme.surface;
 
     return SafeArea(
-      child: Column(
-        children: [
-          AppBar(title: Text(_appBarTitle), centerTitle: true),
-          Expanded(
-            child: PersistentTabView(
-              context,
-              controller: _controller,
-              screens: _screensMobile,
-              items: _navItems(context),
-              backgroundColor: bgColor,
-              handleAndroidBackButtonPress: true,
-              resizeToAvoidBottomInset: true,
-              stateManagement: true,
-              navBarStyle: NavBarStyle.style6,
+      child: Scaffold(
+        body: Column(
+          children: [
+            // AppBar(title: Text(_appBarTitle), centerTitle: true),
+            Expanded(
+              child: PersistentTabView(
+                context,
+                controller: _controller,
+                screens: _screensMobile,
+                items: _navItems(context),
+                backgroundColor: bgColor,
+                handleAndroidBackButtonPress: true,
+                resizeToAvoidBottomInset: true,
+                stateManagement: true,
+                navBarStyle: NavBarStyle.style6,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -152,16 +185,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(CustomStrings.stock),
               ),
               NavigationRailDestination(
-                icon: Icon(CupertinoIcons.person),
-                label: Text(CustomStrings.profilePage),
+                icon: Icon(Icons.keyboard_return_rounded),
+                label: Text(CustomStrings.returnSale),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.receipt_long),
+                label: Text(CustomStrings.salesRecord),
+              ),
+
               NavigationRailDestination(
                 icon: Icon(CupertinoIcons.settings),
                 label: Text(CustomStrings.settings),
-              ),
-              NavigationRailDestination(
-                icon: Icon(CupertinoIcons.table),
-                label: Text(CustomStrings.salesRecord),
               ),
             ],
           ),

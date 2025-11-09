@@ -1,17 +1,25 @@
 import 'dart:async';
 
 import 'package:floor/floor.dart';
+import 'package:local_shoes_store_pos/services/storage/mobile/daos/return_dao.dart';
+import 'package:local_shoes_store_pos/services/storage/mobile/daos/returnline-dao.dart';
+import 'package:local_shoes_store_pos/services/storage/mobile/seeding/defaults.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
-import '../../../models/dto/sales_summery_query.dart';
+import 'daos/category_dao.dart';
+import 'daos/gender_dao.dart';
 import 'daos/movement_dao.dart';
 import 'daos/product_dao.dart';
 import 'daos/sale_dao.dart';
 import 'daos/sale_line_dao.dart';
 import 'daos/variant_dao.dart';
+import 'entities/category.dart';
+import 'entities/gender.dart';
 import 'entities/inventory_movement.dart';
 import 'entities/product_variants.dart';
 import 'entities/products.dart';
+import 'entities/return_entity.dart';
+import 'entities/return_line.dart';
 import 'entities/sale.dart';
 import 'entities/sale_line.dart';
 
@@ -19,8 +27,18 @@ part 'app_database.g.dart';
 
 // NOTE: Version 8 because we migrate inventory_movements to store SKU (TEXT) with FK to product_variants(sku)
 @Database(
-  version: 11,
-  entities: [Product, ProductVariant, InventoryMovement, Sale, SaleLine],
+  version: 14,
+  entities: [
+    Product,
+    ProductVariant,
+    InventoryMovement,
+    Sale,
+    SaleLine,
+    Category,
+    Gender,
+    ReturnEntity, // ✅ Added
+    ReturnLine, // ✅ Added
+  ],
 )
 abstract class AppDatabase extends FloorDatabase {
   ProductDao get productDao;
@@ -28,16 +46,38 @@ abstract class AppDatabase extends FloorDatabase {
   InventoryMovementDao get movementDao;
   SaleDao get saleDao;
   SaleLineDao get saleLineDao;
+  CategoryDao get categoryDao;
+  GenderDao get genderDao;
+  ReturnDao get returnDao;
+  ReturnLineDao get returnLineDao;
+  @transaction
+  Future<void> insertReturnAndLines(
+    ReturnEntity ret,
+    List<ReturnLine> lines,
+  ) async {
+    await returnDao.insertReturn(ret);
+    for (final line in lines) {
+      await returnLineDao.insertReturnLine(line);
+    }
+  }
 }
 
 Future<AppDatabase> openMobileDb(String path) async {
-  return $FloorAppDatabase.databaseBuilder(path).addMigrations([
+  final db = await $FloorAppDatabase.databaseBuilder(path).addMigrations([
     migration1to6,
     migration7to8,
     migration8to9,
     migration9to10,
-    migration10to11, // <-- add this
+    migration10to11,
+    migration11to12,
+    migration12to13,
+    migration13to14,
   ]).build();
+
+  // ✅ Seed defaults if needed
+  await seedDefaultData(db);
+
+  return db;
 }
 
 /// ----------------------------
@@ -317,4 +357,88 @@ FROM product_variants_old;
   await db.execute('DROP TABLE product_variants_old;');
 
   await db.execute('PRAGMA foreign_keys = ON;');
+});
+final migration11to12 = Migration(11, 12, (db) async {
+  await db.execute('PRAGMA foreign_keys = ON;');
+
+  // Categories
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS categories (
+    category_id TEXT PRIMARY KEY,
+    category_name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT,
+    is_synced INTEGER NOT NULL DEFAULT 0
+  );
+  ''');
+
+  // Genders
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS genders (
+    gender_id TEXT PRIMARY KEY,
+    gender_name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT,
+    is_synced INTEGER NOT NULL DEFAULT 0
+  );
+  ''');
+
+  // Update products table to include foreign keys
+  await db.execute('ALTER TABLE products ADD COLUMN category_id TEXT;');
+  await db.execute('ALTER TABLE products ADD COLUMN gender_id TEXT;');
+
+  // Optional indexes
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);',
+  );
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_products_gender_id ON products(gender_id);',
+  );
+});
+
+/// ----------------------------
+/// 12 -> 13: Add returns + return_lines tables
+/// ----------------------------
+final migration12to13 = Migration(12, 13, (db) async {
+  await db.execute('PRAGMA foreign_keys = ON;');
+
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS returns (
+    return_id TEXT PRIMARY KEY,
+    sale_id TEXT NOT NULL,
+    date_time TEXT NOT NULL,
+    total_refund REAL NOT NULL,
+    reason TEXT,
+    createdBy TEXT,
+    is_synced INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  ''');
+
+  await db.execute('''
+  CREATE TABLE IF NOT EXISTS return_lines (
+    return_line_id TEXT PRIMARY KEY,
+    return_id TEXT NOT NULL,
+    variant_id TEXT NOT NULL,
+    qty REAL NOT NULL,
+    unit_price REAL NOT NULL,
+    refund_amount REAL NOT NULL,
+    is_synced INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(return_id) REFERENCES returns(return_id) ON DELETE CASCADE
+  );
+  ''');
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_return_lines_return_id ON return_lines(return_id);',
+  );
+});
+final migration13to14 = Migration(13, 14, (db) async {
+  await db.execute(
+    'ALTER TABLE sales ADD COLUMN sale_type TEXT NOT NULL DEFAULT "sale";',
+  );
 });

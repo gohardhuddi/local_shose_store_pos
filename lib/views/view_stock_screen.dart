@@ -22,6 +22,8 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
   List<StockModel> _allStock = [];
   List<StockModel> _filteredStock = [];
   String _searchQuery = '';
+  List<String> _brands = ['Nike', 'Adidas', 'Puma', 'Reebok', 'Converse'];
+  Set<String> _selectedBrands = {};
 
   @override
   void initState() {
@@ -50,6 +52,7 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
       appBar: AppBar(
         title: Text('${CustomStrings.shopName} ${CustomStrings.stockTitle}'),
         centerTitle: true,
+        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -76,6 +79,32 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                     borderSide: BorderSide.none,
                   ),
                   isDense: true,
+                ),
+              ),
+            ),
+            // 🏷️ Brand Filter Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: _brands.map((brand) {
+                    final isSelected = _selectedBrands.contains(brand);
+                    return FilterChip(
+                      label: Text(brand),
+                      selected: isSelected,
+                      selectedColor: theme.colorScheme.primaryContainer,
+                      checkmarkColor: theme.colorScheme.onPrimaryContainer,
+                      onSelected: (_) => _onBrandChipTapped(brand),
+                      backgroundColor: theme.colorScheme.surfaceVariant,
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? theme.colorScheme.onPrimaryContainer
+                            : theme.colorScheme.onSurface,
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
             ),
@@ -107,18 +136,32 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
                           ),
                     );
 
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${CustomStrings.totalQuantity}: $totalQuantity',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        Text(
-                          '${CustomStrings.totalPrice}: \$${totalValue.toStringAsFixed(0)}',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                      ],
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide =
+                            constraints.maxWidth >
+                            500; // adjust breakpoint as needed
+                        return Flex(
+                          direction: isWide ? Axis.horizontal : Axis.vertical,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom: isWide ? 0 : 8.0,
+                              ),
+                              child: Text(
+                                '${CustomStrings.totalQuantity}: $totalQuantity',
+                                style: theme.textTheme.titleMedium,
+                              ),
+                            ),
+                            Text(
+                              '${CustomStrings.totalPrice}: RS ${totalValue.toStringAsFixed(0)}',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                          ],
+                        );
+                      },
                     );
                   }
                   return const SizedBox.shrink();
@@ -389,4 +432,6 @@ class _ViewStockScreenState extends State<ViewStockScreen> {
       ),
     );
   }
+
+  void _onBrandChipTapped(String brand) {}
 }

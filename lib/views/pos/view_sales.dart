@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:local_shoes_store_pos/helper/constants.dart';
 
 import '../../controller/sales_bloc/sales_bloc.dart';
 import '../../controller/sales_bloc/sales_events.dart';
@@ -14,6 +15,10 @@ class ViewSalesScreen extends StatefulWidget {
 }
 
 class _ViewSalesScreenState extends State<ViewSalesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedFilter = 'all';
+
   @override
   void initState() {
     super.initState();
@@ -25,74 +30,167 @@ class _ViewSalesScreenState extends State<ViewSalesScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sales History'), centerTitle: true),
-      body: BlocBuilder<SalesBloc, SalesStates>(
-        builder: (context, state) {
-          if (state is SalesLoadingState) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      appBar: AppBar(
+        title: const Text(CustomStrings.salesHistory),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.filter_alt),
+            onPressed: () => _pickDateRange(context),
+          ),
+        ],
+      ),
 
-          if (state is GetAllSalesSuccessState) {
-            final sales = state.sales;
-            if (sales.isEmpty) {
-              return _buildEmptyState();
-            }
+      body: Column(
+        children: [
+          // 🔍 SEARCH FIELD
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() => _searchQuery = value);
+                context.read<SalesBloc>().add(
+                  SearchSalesEvent(value),
+                ); // 🔥 LIVE SEARCH
+              },
+              decoration: InputDecoration(
+                hintText: CustomStrings.searchByDate,
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                          context.read<SalesBloc>().add(SearchSalesEvent(''));
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceVariant,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('All'),
+                  selected: _selectedFilter == 'all',
+                  onSelected: (_) {
+                    setState(() => _selectedFilter = 'all');
+                    context.read<SalesBloc>().add(
+                      FilterSalesByTypeEvent('all'),
+                    );
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Sales'),
+                  selected: _selectedFilter == 'sale',
+                  onSelected: (_) {
+                    setState(() => _selectedFilter = 'sale');
+                    context.read<SalesBloc>().add(
+                      FilterSalesByTypeEvent('sale'),
+                    );
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Returns'),
+                  selected: _selectedFilter == 'return',
+                  onSelected: (_) {
+                    setState(() => _selectedFilter = 'return');
+                    context.read<SalesBloc>().add(
+                      FilterSalesByTypeEvent('return'),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
 
-            return ListView.builder(
-              itemCount: sales.length,
-              padding: const EdgeInsets.all(8),
-              itemBuilder: (context, index) {
-                final s = sales[index];
-                final sale = s.sale;
+          Expanded(
+            child: BlocBuilder<SalesBloc, SalesStates>(
+              builder: (context, state) {
+                if (state is SalesLoadingState) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: ExpansionTile(
-                    key: PageStorageKey('sale_${sale.saleId}'),
-                    leading: CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: const Icon(Icons.receipt_long),
-                    ),
-                    title: Text(
-                      'Sale ID: ${sale.saleId}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Total: \$${sale.totalAmount}  |  ${DateFormat('dd MMM yyyy').format(DateTime.parse(sale.dateTime))}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    children: s.lines.map((line) {
-                      return ListTile(
-                        dense: true,
-                        title: Text(
-                          'SKU: ${line.sku}',
-                          style: theme.textTheme.titleSmall,
+                if (state is GetAllSalesSuccessState) {
+                  final sales = state.sales;
+                  if (sales.isEmpty) {
+                    return _buildEmptyState();
+                  }
+
+                  return ListView.builder(
+                    itemCount: sales.length,
+                    padding: const EdgeInsets.all(8),
+                    itemBuilder: (context, index) {
+                      final s = sales[index];
+                      final sale = s.sale;
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        subtitle: Text(
-                          'Qty: ${line.line.qty}  |  Price: \$${line.line.unitPrice}  |  Line Total: \$${line.line.lineTotal}',
-                          style: theme.textTheme.bodySmall,
+                        child: SelectionArea(
+                          child: ExpansionTile(
+                            key: PageStorageKey('sale_${sale.saleId}'),
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  theme.colorScheme.primaryContainer,
+                              child: const Icon(Icons.receipt_long),
+                            ),
+                            title: Text(
+                              '${CustomStrings.saleID} ${sale.saleId}',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${CustomStrings.saleID} ${CustomStrings.currency}${sale.totalAmount}  |  '
+                              '${DateFormat('dd MMM yyyy').format(DateTime.parse(sale.dateTime))}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            children: s.lines.map((line) {
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  '${CustomStrings.sku} ${line.sku}',
+                                  style: theme.textTheme.titleSmall,
+                                ),
+                                subtitle: Text(
+                                  '${CustomStrings.qty} ${line.line.qty}  |  '
+                                  '${CustomStrings.price}: ${CustomStrings.currency} ${line.line.unitPrice}  |  '
+                                  '${CustomStrings.lineTotal}: ${CustomStrings.currency} ${line.line.lineTotal}',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       );
-                    }).toList(),
-                  ),
-                );
+                    },
+                  );
+                }
+
+                if (state is SalesErrorState) {
+                  return Center(child: Text('Error: ${state.error}'));
+                }
+
+                return _buildEmptyState();
               },
-            );
-          }
-
-          if (state is SalesErrorState) {
-            return Center(child: Text('Error: ${state.error}'));
-          }
-
-          return _buildEmptyState();
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -105,12 +203,29 @@ class _ViewSalesScreenState extends State<ViewSalesScreen> {
           Icon(Icons.receipt_long_outlined, size: 72, color: Colors.grey),
           SizedBox(height: 12),
           Text(
-            'No sales recorded yet.',
+            CustomStrings.noSales,
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _pickDateRange(BuildContext context) async {
+    final DateTimeRange? range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now(),
+    );
+
+    if (range != null) {
+      final start = DateFormat('yyyy-MM-dd').format(range.start);
+      final end = DateFormat('yyyy-MM-dd').format(range.end);
+
+      context.read<SalesBloc>().add(
+        GetSalesByDateRangeEvent(startDate: start, endDate: end),
+      );
+    }
   }
 }

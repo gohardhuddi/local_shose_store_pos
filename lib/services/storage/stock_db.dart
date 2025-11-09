@@ -11,6 +11,8 @@ abstract class StockDb {
     required String brand,
     required String articleCode, // unique key (e.g., ADSH001)
     String? articleName,
+    required String category,
+    required String gender,
   });
 
   // -------------------------
@@ -85,15 +87,18 @@ abstract class StockDb {
 
   /// Movement sync helpers (optional but useful for an offline-first pipeline)
   Future<List<Map<String, dynamic>>> getUnsyncedMovements();
+
   Future<void> markMovementSynced(String movementId);
 
   //get unsynced pro and vari
 
   Future<Map<String, dynamic>> getUnsyncedPayload();
+
   // -------------------------
   // Queries / Reporting
   // -------------------------
   Future<List<Map<String, dynamic>>> getAllProducts();
+
   Future<List<Map<String, dynamic>>> getAllVariants();
 
   /// Stock snapshot with aggregated totals and nested variants (JSON string)
@@ -118,5 +123,21 @@ abstract class StockDb {
     required String startDate,
     required String endDate,
   });
+
   Future<List<Map<String, Object?>>> getAllSales();
+
+  Future<List<Map<String, Object?>>> getSalesByDateRange({
+    required String startDate,
+    required String endDate,
+  });
+  Future<String> performReturnTransaction({
+    required String saleId,
+    required List<CartItemModel> returnedItems,
+    required double totalRefund,
+    String? reason,
+    String createdBy,
+    bool isSynced = false,
+  });
+  Future<dynamic> getCategoriesAndGenders();
+  Future<dynamic> updateSyncedProducts({required List<dynamic> mapedList});
 }

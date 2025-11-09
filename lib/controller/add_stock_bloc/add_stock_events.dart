@@ -18,8 +18,12 @@ class AddStockToDB extends AddStockEvents {
   final String purchasePrice;
   final String suggestedSalePrice;
   final bool isEdit;
+  final String category;
+  final String gender;
 
   AddStockToDB({
+    required this.category,
+    required this.gender,
     required this.articleCode,
     required this.articleName,
     required this.brand,
@@ -42,6 +46,8 @@ class AddStockToDB extends AddStockEvents {
     purchasePrice,
     suggestedSalePrice,
     size,
+    category,
+    gender,
   ];
 }
 
@@ -108,3 +114,7 @@ class AddStockMovementEvent extends AddStockEvents {
   @override
   List<Object> get props => [productCodeSku, movementType, quantity];
 }
+
+class GetCategoriesEvent extends AddStockEvents {}
+
+class GetGendersEvent extends AddStockEvents {}

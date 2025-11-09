@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart' show DateFormat;
-import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_bloc.dart';
-import 'package:local_shoes_store_pos/controller/add_stock_bloc/add_stock_states.dart';
-import 'package:local_shoes_store_pos/controller/sales_bloc/sales_bloc.dart';
-import 'package:local_shoes_store_pos/controller/sales_bloc/sales_events.dart';
-import 'package:local_shoes_store_pos/controller/sales_bloc/sales_states.dart';
-import 'package:local_shoes_store_pos/helper/constants.dart';
-import 'package:local_shoes_store_pos/models/cart_model.dart';
-import 'package:local_shoes_store_pos/models/stock_model.dart';
-import 'package:local_shoes_store_pos/views/view_helpers/search_helper.dart';
+import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
+import '../../controller/add_stock_bloc/add_stock_bloc.dart';
 import '../../controller/add_stock_bloc/add_stock_events.dart';
+import '../../controller/add_stock_bloc/add_stock_states.dart';
+import '../../controller/sales_bloc/sales_bloc.dart';
+import '../../controller/sales_bloc/sales_events.dart';
+import '../../controller/sales_bloc/sales_states.dart';
+import '../../helper/constants.dart';
+import '../../models/cart_model.dart';
+import '../../models/stock_model.dart';
+import '../view_helpers/search_helper.dart';
 import 'cart_screen.dart';
 
 class POSHomeScreen extends StatefulWidget {
@@ -38,7 +38,6 @@ class _POSHomeScreenState extends State<POSHomeScreen>
     super.initState();
     _controller = AnimationController(vsync: this);
 
-    // _load();
     _getSales();
   }
 
@@ -116,14 +115,8 @@ class _POSHomeScreenState extends State<POSHomeScreen>
     final stockList = BlocListener<SalesBloc, SalesStates>(
       listener: (context, state) {
         if (state is VariantAddedToCartSuccessState) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.success),
-              backgroundColor: Colors.green,
-            ),
-          );
           _load();
-          _getSales();
+          //   _getSales();
         }
         if (state is VariantAddToCartFailedState) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -136,7 +129,7 @@ class _POSHomeScreenState extends State<POSHomeScreen>
             ),
           );
           _load();
-          _getSales();
+          // _getSales();
         }
       },
       child: BlocBuilder<AddStockBloc, AddStockStates>(
@@ -184,7 +177,6 @@ class _POSHomeScreenState extends State<POSHomeScreen>
         appBar: AppBar(
           title: Text(CustomStrings.saleScreenHeading),
           centerTitle: true,
-          elevation: 2,
         ),
         body: Column(
           children: [
@@ -201,7 +193,10 @@ class _POSHomeScreenState extends State<POSHomeScreen>
               screen: const CartScreen(),
               withNavBar: false,
               pageTransitionAnimation: PageTransitionAnimation.cupertino,
-            ).then((_) => _load());
+            ).then((_) {
+              _load();
+              _getSales();
+            });
           },
           icon: const Icon(Icons.shopping_cart),
           label: Text(CustomStrings.viewCartButton),
@@ -328,26 +323,20 @@ class _POSHomeScreenState extends State<POSHomeScreen>
           BlocBuilder<SalesBloc, SalesStates>(
             builder: (context, state) {
               if (state is SalesSummaryLoadedState) {
-                return Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Today\'s Sales',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text('Total Sales: ${state.summary?.totalSales}'),
-                        Text('Total Orders: ${state.summary?.totalOrders}'),
-                        Text('Items Sold: ${state.summary?.itemsSold}'),
-                      ],
-                    ),
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Today\'s Sales',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Total Sales: ${state.summary?.totalSales}'),
+                      Text('Total Orders: ${state.summary?.totalOrders}'),
+                      Text('Items Sold: ${state.summary?.itemsSold}'),
+                    ],
                   ),
                 );
               } else {

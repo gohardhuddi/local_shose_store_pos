@@ -3,11 +3,9 @@ class Assets {
   Assets._();
 
   static const String animationsGroth = 'assets/animations/growth.json';
-  static const String imagesChatGPT Image Aug 25, 2025, 074345 AM = 'assets/images/ChatGPT Image Aug 25, 2025, 07_43_45 AM.png';
   static const String imagesCloudService = 'assets/images/cloud-service.png';
   static const String imagesInternet = 'assets/images/internet.png';
   static const String imagesResponsive = 'assets/images/responsive.png';
   static const String imagesShoeBlackIcon = 'assets/images/shoe_black_icon.png';
   static const String imagesShoeWhiteIcon = 'assets/images/shoe_white_icon.png';
-
 }
