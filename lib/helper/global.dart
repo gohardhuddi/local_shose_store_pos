@@ -7,8 +7,10 @@ GetIt getIt = GetIt.instance;
 class Global {
   static final GlobalKey<ScaffoldMessengerState> appScaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
-  static const String host = '0.0.0.0';
-  static const int port = 5245;
+  // static const String host = '0.0.0.0';
+  // static const int port = 5245;
+  static const String host = '129.151.155.214';
+  static const int port = 5000;
   static const String baseUrl = 'http://$host:$port/api/';
   static void setup() {
     // Register Dio as a lazy singleton (created only when first requested)

@@ -37,14 +37,14 @@ Future<void> main() async {
   await stockDb.init();
   final info = await DeviceInfoService.getDeviceInfo();
   debugPrint('Device info: $info');
-  testApi();
+  //testApi();
   runApp(const MyApp());
 }
 
 Future<void> testApi() async {
   var dio = Dio();
   var response = await dio.request(
-    'http://0.0.0.0:5245/api/Stock',
+    '${Global.baseUrl}Stock',
     options: Options(method: 'GET'),
   );
 

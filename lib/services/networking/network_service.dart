@@ -48,7 +48,7 @@ class NetworkService {
     try {
       final res = await dio
           .get(
-            'https://127.0.0.1:7245/api/health', // or your own endpoint
+            '${Global.baseUrl}Stock/health', // or your own endpoint
             options: Options(
               receiveDataWhenStatusError: false,
               sendTimeout: const Duration(seconds: 10),
