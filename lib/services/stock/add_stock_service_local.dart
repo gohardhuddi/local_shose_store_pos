@@ -195,4 +195,12 @@ class StockServiceLocal {
   Future<bool> deleteVariantById(String variantId, {bool hard = false}) {
     return stockDb.deleteVariantById(variantId, hard: hard);
   }
+
+  Future<dynamic> getCategoriesAndGendersService() async {
+    return stockDb.getCategoriesAndGenders();
+  }
+
+  Future<dynamic> updateSyncedProducts(List<dynamic> mapedList) async {
+    return stockDb.updateSyncedProducts(mapedList: mapedList);
+  }
 }

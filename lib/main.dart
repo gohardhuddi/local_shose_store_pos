@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,8 +37,22 @@ Future<void> main() async {
   await stockDb.init();
   final info = await DeviceInfoService.getDeviceInfo();
   debugPrint('Device info: $info');
-
+  testApi();
   runApp(const MyApp());
+}
+
+Future<void> testApi() async {
+  var dio = Dio();
+  var response = await dio.request(
+    'http://0.0.0.0:5245/api/Stock',
+    options: Options(method: 'GET'),
+  );
+
+  if (response.statusCode == 200) {
+    print(json.encode(response.data));
+  } else {
+    print(response.statusMessage);
+  }
 }
 
 class MyApp extends StatelessWidget {

@@ -9,8 +9,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../models/cart_model.dart';
 import 'mobile/app_database.dart';
-import 'mobile/entities/category.dart';
-import 'mobile/entities/gender.dart';
 import 'mobile/entities/inventory_movement.dart';
 import 'mobile/entities/product_variants.dart';
 import 'mobile/entities/products.dart';
@@ -46,40 +44,14 @@ class StockDbFloor implements StockDb {
     final now = DateTime.now().toIso8601String();
 
     // --- Ensure Category Exists ---
-    final existingCategory = await db.categoryDao.findByName(category.trim());
-    String categoryId;
-    if (existingCategory != null) {
-      categoryId = existingCategory.categoryId;
-    } else {
-      categoryId = DateTime.now().millisecondsSinceEpoch.toString();
-      final newCategory = Category(
-        categoryId: categoryId,
-        categoryName: category.trim(),
-        isActive: 1,
-        createdAt: now,
-        updatedAt: now,
-        isSynced: 0,
-      );
-      await db.categoryDao.insertCategory(newCategory);
-    }
+    final existingCategory = await db.categoryDao.findById(category.trim());
+    String? categoryId = existingCategory?.categoryId;
 
     // --- Ensure Gender Exists ---
-    final existingGender = await db.genderDao.findByName(gender.trim());
-    String genderId;
-    if (existingGender != null) {
-      genderId = existingGender.genderId;
-    } else {
-      genderId = DateTime.now().millisecondsSinceEpoch.toString();
-      final newGender = Gender(
-        genderId: genderId,
-        genderName: gender.trim(),
-        isActive: 1,
-        createdAt: now,
-        updatedAt: now,
-        isSynced: 0,
-      );
-      await db.genderDao.insertGender(newGender);
-    }
+    final existingGender = await db.genderDao.findById(gender.trim());
+    String? genderId;
+
+    genderId = existingGender?.genderId;
 
     // --- Check if Product Already Exists ---
     final existingProduct = await db.productDao.findByArticleCode(articleCode);
@@ -429,6 +401,8 @@ class StockDbFloor implements StockDb {
               'is_synced': p.isSynced,
               'created_at': p.createdAt,
               'updated_at': p.updatedAt,
+              'category_id': p.categoryId,
+              'gender_id': p.genderId,
             },
           )
           .toList(),
@@ -932,5 +906,20 @@ class StockDbFloor implements StockDb {
       } catch (_) {}
       rethrow;
     }
+  }
+
+  @override
+  Future getCategoriesAndGenders() async {
+    final categories = await db.categoryDao.findActive();
+    final genders = await _db?.genderDao.findActive();
+    return {"categories": categories, "genders": genders};
+  }
+
+  @override
+  Future<void> updateSyncedProducts({required List<dynamic> mapedList}) async {
+    for (final id in mapedList) {
+      await db.productDao.markSynced(id);
+    }
+    ;
   }
 }

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../helper/constants.dart';
 import '../../models/stock_model.dart';
 import '../../repository/add_stock_repository.dart';
 import 'add_stock_events.dart';
@@ -16,6 +19,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
     on<GetUnSyncedStockFromDB>(_onGetAllUnsyncedStock);
     on<DeleteVariantByIdEvent>(_onDeleteVariantById);
     on<AddStockMovementEvent>(_onAddStockMovementToDB);
+    on<GetCategoriesEvent>(_onGetCategoriesAndGenders);
   }
 
   Future<void> _onAddStockToDB(
@@ -40,8 +44,12 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
 
     // Optionally reload list here if your UI expects fresh data:
     // await _reloadStock(emit);
-
-    emit(AddStockSuccessState());
+    add(GetUnSyncedStockFromDB());
+    emit(
+      AddStockSuccessState(
+        successMessage: CustomStrings.stockAddedSuccessfully,
+      ),
+    );
   }
 
   Future<void> _onEditVariant(
@@ -69,7 +77,11 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       isSynced: false,
     );
 
-    emit(AddStockSuccessState());
+    emit(
+      AddStockSuccessState(
+        successMessage: CustomStrings.stockAddedSuccessfully,
+      ),
+    );
   }
 
   Future<void> _onGetAllStock(
@@ -82,7 +94,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       final stockList = StockModel.listFromJsonString(json);
       emit(GetStockFromDBSuccessState(stockList: stockList, query: ''));
     } catch (e) {
-      emit(AddStockErrorState());
+      emit(AddStockErrorState(error: CustomStrings.productSyncedError));
     }
   }
 
@@ -95,9 +107,14 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       final unSynced = await _addStockRepo.getUnSyncPayloadRepo();
       final mappedList = await _addStockRepo.mapUnsyncedToBackend(unSynced);
       final result = await _addStockRepo.syncProductsToBackend(mappedList);
-      emit(AddStockSuccessState());
+      await _addStockRepo.updateSyncedProducts(result.data['syncedProductIds']);
+      emit(
+        AddStockSuccessState(
+          successMessage: CustomStrings.productSyncedSuccessfully,
+        ),
+      );
     } catch (e) {
-      emit(AddStockErrorState());
+      emit(AddStockErrorState(error: CustomStrings.somethingWentWrong));
     }
   }
 
@@ -110,7 +127,7 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       bool result = await _addStockRepo.deleteVariantById(event.variantID);
       if (result) emit(DeleteVariantByIdSuccessState());
     } catch (e) {
-      emit(AddStockErrorState());
+      emit(AddStockErrorState(error: CustomStrings.productSyncedError));
     }
   }
 
@@ -129,5 +146,18 @@ class AddStockBloc extends Bloc<AddStockEvents, AddStockStates> {
       isSynced: false,
     );
     emit(MovementsSuccessState());
+  }
+
+  Future<void> _onGetCategoriesAndGenders(
+    GetCategoriesEvent event,
+    Emitter<AddStockStates> emit,
+  ) async {
+    final genderAndCategory = await _addStockRepo.getCategoriesAndGendersRepo();
+    emit(
+      GetCategoriesAndGendersSuccessState(
+        categories: genderAndCategory['categories'],
+        genders: genderAndCategory['genders'],
+      ),
+    );
   }
 }

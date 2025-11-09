@@ -138,4 +138,6 @@ abstract class StockDb {
     String createdBy,
     bool isSynced = false,
   });
+  Future<dynamic> getCategoriesAndGenders();
+  Future<dynamic> updateSyncedProducts({required List<dynamic> mapedList});
 }

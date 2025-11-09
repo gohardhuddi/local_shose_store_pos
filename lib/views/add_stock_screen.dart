@@ -9,7 +9,6 @@ import 'package:local_shoes_store_pos/models/stock_model.dart';
 import 'package:local_shoes_store_pos/views/view_helpers/resueables/custom_button.dart';
 import 'package:local_shoes_store_pos/views/view_helpers/resueables/custom_text_field.dart';
 
-import '../services/storage/mobile/app_database.dart';
 import '../services/storage/mobile/entities/category.dart';
 import '../services/storage/mobile/entities/gender.dart';
 
@@ -24,21 +23,19 @@ class AddStockScreen extends StatefulWidget {
 }
 
 class _AddStockScreenState extends State<AddStockScreen> {
-  // ----------------------- Controllers -----------------------
+  // ---------------- Controllers ----------------
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController brandController = TextEditingController();
-  final TextEditingController articleCodeController = TextEditingController();
-  final TextEditingController articleNameController = TextEditingController();
-  final TextEditingController sizeController = TextEditingController();
-  final TextEditingController productCodeSKUController =
-      TextEditingController();
-  final TextEditingController purchasePriceController = TextEditingController();
-  final TextEditingController suggestedSalePriceController =
-      TextEditingController();
-  final TextEditingController quantityController = TextEditingController();
-  final TextEditingController customColorController = TextEditingController();
+  final brandController = TextEditingController();
+  final articleCodeController = TextEditingController();
+  final articleNameController = TextEditingController();
+  final sizeController = TextEditingController();
+  final productCodeSKUController = TextEditingController();
+  final purchasePriceController = TextEditingController();
+  final suggestedSalePriceController = TextEditingController();
+  final quantityController = TextEditingController();
+  final customColorController = TextEditingController();
 
-  // ----------------------- Dropdowns -----------------------
+  // ---------------- Dropdown Lists ----------------
   final List<String> colors = [
     CustomStrings.black,
     CustomStrings.brown,
@@ -47,21 +44,19 @@ class _AddStockScreenState extends State<AddStockScreen> {
     CustomStrings.blue,
     CustomStrings.other,
   ];
-  String? selectedColor;
-  String? selectedCategory;
-  String? selectedGender;
 
-  // ----------------------- Floor DB Lists -----------------------
+  String? selectedColor;
+  Category? selectedCategory;
+  Gender? selectedGender;
+
+  // ---------------- DB ----------------
   List<Category> categories = [];
   List<Gender> genders = [];
 
-  late final AppDatabase _db;
-
-  // ----------------------- Init -----------------------
   @override
   void initState() {
     super.initState();
-    _initDB();
+
     final v = widget.varient;
     if (v != null && widget.stock != null) {
       brandController.text = widget.stock!.brand;
@@ -74,372 +69,240 @@ class _AddStockScreenState extends State<AddStockScreen> {
       sizeController.text = v.size.toString();
       _prefillColorFromVariant(v.colorName);
     }
+
+    // ✅ Safe Bloc event trigger
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AddStockBloc>().add(GetCategoriesEvent());
+    });
   }
 
-  // ----------------------- Load Categories & Genders -----------------------
-  Future<void> _initDB() async {
-    _db = await openMobileDb(CustomStrings.dbname);
-    await _loadCategories();
-    await _loadGenders();
-  }
-
-  Future<void> _loadCategories() async {
-    final data = await _db.categoryDao.findActive();
-    setState(() => categories = data);
-  }
-
-  Future<void> _loadGenders() async {
-    final data = await _db.genderDao.findActive();
-    setState(() => genders = data);
-  }
-
-  // ----------------------- UI -----------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: categories.isEmpty && genders.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: const EdgeInsets.all(18.0),
-                child: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    child: BlocListener<AddStockBloc, AddStockStates>(
-                      listener: (context, state) {
-                        if (state is AddStockSuccessState) {
-                          context.read<AddStockBloc>().add(
-                            AddStockMovementEvent(
-                              productCodeSku: productCodeSKUController.text
-                                  .trim(),
-                              movementType: StockMovementType.purchaseIn,
-                              quantity: quantityController.text.trim(),
-                            ),
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                state.successMessage,
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      },
-                      child: Column(
-                        spacing: 15,
-                        children: [
-                          _header(context),
-                          Text(
-                            CustomStrings.addStock,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          _dividerTitle(context, CustomStrings.product),
+        child: Padding(
+          padding: const EdgeInsets.all(18.0),
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              // ✅ Use BlocConsumer instead of BlocListener
+              child: BlocConsumer<AddStockBloc, AddStockStates>(
+                listener: (context, state) {
+                  if (state is AddStockSuccessState) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(state.successMessage),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                  if (state is AddStockErrorState) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(state.error),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                builder: (context, state) {
+                  if (state is GetCategoriesAndGendersSuccessState) {
+                    categories = state.categories;
+                    genders = state.genders;
+                  }
 
-                          // ---------------- Product Inputs ----------------
-                          CustomTextField(
-                            textEditingController: brandController,
-                            labelText: CustomStrings.brand,
-                            hintText: CustomStrings.brandHint,
-                            validator: (v) =>
-                                _requiredFieldValidator(v, CustomStrings.brand),
-                          ),
-                          CustomTextField(
-                            textEditingController: articleCodeController,
-                            labelText: CustomStrings.articleCode,
-                            hintText: CustomStrings.articleCodeHint,
-                            validator: (v) => _requiredFieldValidator(
-                              v,
-                              CustomStrings.articleCode,
+                  return Column(
+                    spacing: 15,
+                    children: [
+                      _header(context),
+                      Text(
+                        CustomStrings.addStock,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      _dividerTitle(context, CustomStrings.product),
+
+                      CustomTextField(
+                        textEditingController: brandController,
+                        labelText: CustomStrings.brand,
+                        hintText: CustomStrings.brandHint,
+                        validator: (v) =>
+                            _requiredFieldValidator(v, CustomStrings.brand),
+                      ),
+                      CustomTextField(
+                        textEditingController: articleCodeController,
+                        labelText: CustomStrings.articleCode,
+                        hintText: CustomStrings.articleCodeHint,
+                        validator: (v) => _requiredFieldValidator(
+                          v,
+                          CustomStrings.articleCode,
+                        ),
+                      ),
+                      CustomTextField(
+                        textEditingController: articleNameController,
+                        labelText: CustomStrings.articleName,
+                        hintText: CustomStrings.articleNameHint,
+                      ),
+
+                      _dividerTitle(context, CustomStrings.variant),
+
+                      CustomTextField(
+                        textEditingController: sizeController,
+                        labelText: CustomStrings.size,
+                        hintText: CustomStrings.sizeHint,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        validator: (v) =>
+                            _requiredFieldValidator(v, CustomStrings.size),
+                      ),
+
+                      DropdownButtonFormField<String>(
+                        value: selectedColor,
+                        decoration: const InputDecoration(
+                          labelText: CustomStrings.color,
+                          border: OutlineInputBorder(),
+                        ),
+                        items: colors
+                            .map(
+                              (c) => DropdownMenuItem(value: c, child: Text(c)),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          selectedColor = v;
+                          updateSku();
+                          setState(() {});
+                        },
+                        validator: (v) =>
+                            v == null || v.isEmpty ? "Color required" : null,
+                      ),
+                      if (selectedColor == CustomStrings.other)
+                        CustomTextField(
+                          textEditingController: customColorController,
+                          labelText: CustomStrings.color,
+                          hintText: CustomStrings.colorHint,
+                          onChanged: (_) => updateSku(),
+                        ),
+
+                      // ---------------- Category Dropdown ----------------
+                      DropdownButtonFormField<Category>(
+                        value: selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: "Category",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          ...categories.map(
+                            (cat) => DropdownMenuItem(
+                              value: cat,
+                              child: Text(cat.categoryName),
                             ),
-                          ),
-                          CustomTextField(
-                            textEditingController: articleNameController,
-                            labelText: CustomStrings.articleName,
-                            hintText: CustomStrings.articleNameHint,
-                          ),
-
-                          _dividerTitle(context, CustomStrings.variant),
-
-                          // ---------------- Variant Inputs ----------------
-                          CustomTextField(
-                            textEditingController: sizeController,
-                            labelText: CustomStrings.size,
-                            hintText: CustomStrings.sizeHint,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            validator: (v) =>
-                                _requiredFieldValidator(v, CustomStrings.size),
-                          ),
-
-                          // ---------------- Color ----------------
-                          DropdownButtonFormField<String>(
-                            value: selectedColor,
-                            decoration: const InputDecoration(
-                              labelText: CustomStrings.color,
-                              border: OutlineInputBorder(),
-                            ),
-                            items: colors
-                                .map(
-                                  (c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(c),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) {
-                              selectedColor = v;
-                              updateSku();
-                              setState(() {});
-                            },
-                            validator: (v) => v == null || v.isEmpty
-                                ? "Color is required"
-                                : null,
-                          ),
-                          if (selectedColor == CustomStrings.other)
-                            CustomTextField(
-                              textEditingController: customColorController,
-                              labelText: CustomStrings.color,
-                              hintText: CustomStrings.colorHint,
-                              onChanged: (v) => updateSku(),
-                            ),
-
-                          // ---------------- Category ----------------
-                          DropdownButtonFormField<String>(
-                            value: selectedCategory,
-                            decoration: const InputDecoration(
-                              labelText: "Category",
-                              border: OutlineInputBorder(),
-                            ),
-                            items: [
-                              ...categories.map(
-                                (cat) => DropdownMenuItem(
-                                  value: cat.categoryName,
-                                  child: Text(cat.categoryName),
-                                ),
-                              ),
-                              const DropdownMenuItem(
-                                value: "__add_new_category__",
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.add, color: Colors.blueAccent),
-                                    SizedBox(width: 6),
-                                    Text("Add new category"),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) async {
-                              if (v == "__add_new_category__") {
-                                final newCat = await _showAddItemSheet(
-                                  context,
-                                  title: "Add Category",
-                                  hint: "Enter category name",
-                                );
-                                if (newCat != null &&
-                                    newCat.trim().isNotEmpty) {
-                                  final cat = Category(
-                                    categoryId: DateTime.now()
-                                        .millisecondsSinceEpoch
-                                        .toString(),
-                                    categoryName: newCat.trim(),
-                                    isActive: 1,
-                                    createdAt: DateTime.now().toIso8601String(),
-                                    updatedAt: DateTime.now().toIso8601String(),
-                                    isSynced: 0,
-                                  );
-                                  await _db.categoryDao.insertCategory(cat);
-                                  await _loadCategories();
-                                  setState(
-                                    () => selectedCategory = newCat.trim(),
-                                  );
-                                }
-                              } else {
-                                setState(() => selectedCategory = v);
-                              }
-                            },
-                            validator: (v) => v == null || v.isEmpty
-                                ? "Category is required"
-                                : null,
-                          ),
-
-                          // ---------------- Gender ----------------
-                          DropdownButtonFormField<String>(
-                            value: selectedGender,
-                            decoration: const InputDecoration(
-                              labelText: "Gender",
-                              border: OutlineInputBorder(),
-                            ),
-                            items: [
-                              ...genders.map(
-                                (g) => DropdownMenuItem(
-                                  value: g.genderName,
-                                  child: Text(g.genderName),
-                                ),
-                              ),
-                              const DropdownMenuItem(
-                                value: "__add_new_gender__",
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.add, color: Colors.blueAccent),
-                                    SizedBox(width: 6),
-                                    Text("Add new gender"),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) async {
-                              if (v == "__add_new_gender__") {
-                                final newGen = await _showAddItemSheet(
-                                  context,
-                                  title: "Add Gender",
-                                  hint: "Enter gender name",
-                                );
-                                if (newGen != null &&
-                                    newGen.trim().isNotEmpty) {
-                                  final gen = Gender(
-                                    genderId: DateTime.now()
-                                        .millisecondsSinceEpoch
-                                        .toString(),
-                                    genderName: newGen.trim(),
-                                    isActive: 1,
-                                    createdAt: DateTime.now().toIso8601String(),
-                                    updatedAt: DateTime.now().toIso8601String(),
-                                    isSynced: 0,
-                                  );
-                                  await _db.genderDao.insertGender(gen);
-                                  await _loadGenders();
-                                  setState(
-                                    () => selectedGender = newGen.trim(),
-                                  );
-                                }
-                              } else {
-                                setState(() => selectedGender = v);
-                              }
-                            },
-                            validator: (v) => v == null || v.isEmpty
-                                ? "Gender is required"
-                                : null,
-                          ),
-
-                          // ---------------- Remaining Fields ----------------
-                          CustomTextField(
-                            textEditingController: productCodeSKUController,
-                            labelText: CustomStrings.productCodeSku,
-                            hintText: CustomStrings.productCodeSkuHint,
-                            validator: (v) => _requiredFieldValidator(
-                              v,
-                              CustomStrings.productCodeSku,
-                            ),
-                          ),
-                          CustomTextField(
-                            textEditingController: quantityController,
-                            labelText: CustomStrings.quantity,
-                            hintText: CustomStrings.quantityHint,
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              var err = _requiredFieldValidator(
-                                v,
-                                CustomStrings.quantity,
-                              );
-                              if (err == null &&
-                                  (int.tryParse(v ?? "0") ?? 0) <= 0) {
-                                return CustomStrings.quantityGreaterThanZero;
-                              }
-                              return err;
-                            },
-                          ),
-                          CustomTextField(
-                            textEditingController: purchasePriceController,
-                            labelText: CustomStrings.purchasePrice,
-                            hintText: CustomStrings.purchasePriceHint,
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              var err = _requiredFieldValidator(
-                                v,
-                                CustomStrings.purchasePrice,
-                              );
-                              if (err == null &&
-                                  (int.tryParse(v ?? "0") ?? 0) <= 0) {
-                                return CustomStrings.priceGreaterThanZero;
-                              }
-                              return err;
-                            },
-                          ),
-                          CustomTextField(
-                            textEditingController: suggestedSalePriceController,
-                            labelText: CustomStrings.suggestedSalePrice,
-                            hintText: CustomStrings.suggestedSalePriceHint,
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              var err = _requiredFieldValidator(
-                                v,
-                                CustomStrings.suggestedSalePrice,
-                              );
-                              if (err == null) {
-                                if ((int.tryParse(v ?? "0") ?? 0) <
-                                    (int.tryParse(
-                                          purchasePriceController.text,
-                                        ) ??
-                                        0)) {
-                                  return CustomStrings
-                                      .salePriceGreaterThanPurchase;
-                                }
-                              }
-                              return err;
-                            },
-                          ),
-
-                          // ---------------- Submit ----------------
-                          CustomButton(
-                            onPressed: () {
-                              if (_formKey.currentState!.validate()) {
-                                context.read<AddStockBloc>().add(
-                                  AddStockToDB(
-                                    articleCode: articleCodeController.text
-                                        .trim(),
-                                    articleName: articleNameController.text
-                                        .trim(),
-                                    brand: brandController.text.trim(),
-                                    color:
-                                        selectedColor!.trim().toLowerCase() ==
-                                            "other"
-                                        ? customColorController.text
-                                        : selectedColor!.trim(),
-                                    productCodeSku: productCodeSKUController
-                                        .text
-                                        .trim(),
-                                    purchasePrice: purchasePriceController.text
-                                        .trim(),
-                                    quantity: quantityController.text.trim(),
-                                    size: sizeController.text.trim(),
-                                    suggestedSalePrice:
-                                        suggestedSalePriceController.text
-                                            .trim(),
-                                    category: selectedCategory ?? "",
-                                    gender: selectedGender ?? "",
-                                    isEdit: widget.varient != null,
-                                  ),
-                                );
-                              }
-                            },
-                            buttonTitle: CustomStrings.addStock,
                           ),
                         ],
+                        onChanged: (value) async {
+                          setState(() => selectedCategory = value);
+                        },
+                        validator: (v) =>
+                            v == null ? "Category is required" : null,
                       ),
-                    ),
-                  ),
-                ),
+
+                      // ---------------- Gender Dropdown ----------------
+                      DropdownButtonFormField<Gender>(
+                        value: selectedGender,
+                        decoration: const InputDecoration(
+                          labelText: "Gender",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          ...genders.map(
+                            (g) => DropdownMenuItem(
+                              value: g,
+                              child: Text(g.genderName),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) async {
+                          setState(() => selectedGender = value);
+                        },
+                        validator: (v) =>
+                            v == null ? "Gender is required" : null,
+                      ),
+
+                      // ---------------- Remaining Fields ----------------
+                      CustomTextField(
+                        textEditingController: productCodeSKUController,
+                        labelText: CustomStrings.productCodeSku,
+                        hintText: CustomStrings.productCodeSkuHint,
+                        validator: (v) => _requiredFieldValidator(v, "SKU"),
+                      ),
+                      CustomTextField(
+                        textEditingController: quantityController,
+                        labelText: CustomStrings.quantity,
+                        hintText: CustomStrings.quantityHint,
+                        keyboardType: TextInputType.number,
+                        validator: (v) =>
+                            _requiredFieldValidator(v, "Quantity"),
+                      ),
+                      CustomTextField(
+                        textEditingController: purchasePriceController,
+                        labelText: CustomStrings.purchasePrice,
+                        hintText: CustomStrings.purchasePriceHint,
+                        keyboardType: TextInputType.number,
+                        validator: (v) =>
+                            _requiredFieldValidator(v, "Purchase Price"),
+                      ),
+                      CustomTextField(
+                        textEditingController: suggestedSalePriceController,
+                        labelText: CustomStrings.suggestedSalePrice,
+                        hintText: CustomStrings.suggestedSalePriceHint,
+                        keyboardType: TextInputType.number,
+                        validator: (v) =>
+                            _requiredFieldValidator(v, "Sale Price"),
+                      ),
+
+                      // ---------------- Submit ----------------
+                      CustomButton(
+                        onPressed: () {
+                          if (_formKey.currentState!.validate()) {
+                            context.read<AddStockBloc>().add(
+                              AddStockToDB(
+                                articleCode: articleCodeController.text.trim(),
+                                articleName: articleNameController.text.trim(),
+                                brand: brandController.text.trim(),
+                                color: selectedColor == CustomStrings.other
+                                    ? customColorController.text.trim()
+                                    : selectedColor!.trim(),
+                                productCodeSku: productCodeSKUController.text
+                                    .trim(),
+                                purchasePrice: purchasePriceController.text
+                                    .trim(),
+                                quantity: quantityController.text.trim(),
+                                size: sizeController.text.trim(),
+                                suggestedSalePrice: suggestedSalePriceController
+                                    .text
+                                    .trim(),
+                                category: selectedCategory!.categoryId,
+                                gender: selectedGender!.genderId,
+                                isEdit: widget.varient != null,
+                              ),
+                            );
+                          }
+                        },
+                        buttonTitle: CustomStrings.addStock,
+                      ),
+                    ],
+                  );
+                },
               ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  // ----------------------- Helpers -----------------------
+  // ---------------- Helpers ----------------
   Widget _header(BuildContext context) => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -511,8 +374,8 @@ class _AddStockScreenState extends State<AddStockScreen> {
     required String title,
     required String hint,
   }) async {
-    final TextEditingController controller = TextEditingController();
-    return await showModalBottomSheet<String>(
+    final controller = TextEditingController();
+    return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,

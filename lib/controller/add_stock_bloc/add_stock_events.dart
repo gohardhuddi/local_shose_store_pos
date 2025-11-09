@@ -114,3 +114,7 @@ class AddStockMovementEvent extends AddStockEvents {
   @override
   List<Object> get props => [productCodeSku, movementType, quantity];
 }
+
+class GetCategoriesEvent extends AddStockEvents {}
+
+class GetGendersEvent extends AddStockEvents {}

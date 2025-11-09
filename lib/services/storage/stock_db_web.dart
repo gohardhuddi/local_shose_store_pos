@@ -762,4 +762,16 @@ class StockDbWeb implements StockDb {
     // TODO: implement performReturnTransaction
     throw UnimplementedError();
   }
+
+  @override
+  Future getCategoriesAndGenders() {
+    // TODO: implement getCategoriesAndGenders
+    throw UnimplementedError();
+  }
+
+  @override
+  Future updateSyncedProducts({required List<dynamic> mapedList}) {
+    // TODO: implement updateSyncedProducts
+    throw UnimplementedError();
+  }
 }
